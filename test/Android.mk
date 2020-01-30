@@ -110,7 +110,7 @@ endif # PLATFORM_VERSION == Q
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+        libGLES_mali
 endif
 
 include $(BUILD_EXECUTABLE)
@@ -209,7 +209,7 @@ endif # PLATFORM_VERSION == Q
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+        libGLES_mali
 endif
 
 include $(BUILD_EXECUTABLE)
@@ -305,7 +305,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+        libGLES_mali
 endif
 
 include $(BUILD_EXECUTABLE)

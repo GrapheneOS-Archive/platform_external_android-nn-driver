@@ -168,7 +168,7 @@ endif # PLATFORM_VERSION == Q
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+        libGLES_mali
 endif
 
 include $(BUILD_STATIC_LIBRARY)
@@ -281,7 +281,7 @@ endif # PLATFORM_VERSION == Q
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+        libGLES_mali
 endif
 
 include $(BUILD_STATIC_LIBRARY)
@@ -389,7 +389,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+        libGLES_mali
 endif
 
 include $(BUILD_STATIC_LIBRARY)
@@ -479,7 +479,7 @@ endif # PLATFORM_VERSION == Q
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+        libGLES_mali
 endif
 
 include $(BUILD_EXECUTABLE)
@@ -566,7 +566,7 @@ endif # PLATFORM_VERSION == Q
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+        libGLES_mali
 endif
 
 include $(BUILD_EXECUTABLE)
@@ -642,7 +642,9 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+        libGLES_mali
+LOCAL_LDFLAGS_32 := -Wl,-rpath,$(2ND_TARGET_OUT_VENDOR_SHARED_LIBRARIES)/egl
+LOCAL_LDFLAGS_64 := -Wl,-rpath,$(TARGET_OUT_VENDOR_SHARED_LIBRARIES)/egl
 endif
 
 include $(BUILD_EXECUTABLE)
