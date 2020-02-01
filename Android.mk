@@ -598,7 +598,11 @@ LOCAL_CFLAGS := \
         -std=$(CPP_VERSION) \
         -fexceptions \
         -DARMNN_ANDROID_NN_V1_2 \
-        -DBOOST_NO_AUTO_PTR
+        -DBOOST_NO_AUTO_PTR \
+        -Wno-unused-variable \
+        -Wno-unneeded-internal-declaration \
+        -Wno-unused-function \
+        -Wno-unused-local-typedef
 
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS += \
