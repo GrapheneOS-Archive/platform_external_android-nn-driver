@@ -8,6 +8,7 @@ LOCAL_PATH := $(ANDROID_NN_DRIVER_LOCAL_PATH)
 
 P_OR_LATER := 0
 Q_OR_LATER := 0
+R_OR_LATER := 0
 
 ifeq ($(PLATFORM_VERSION),9)
 P_OR_LATER := 1
@@ -24,6 +25,16 @@ ifeq ($(PLATFORM_VERSION),Q)
 P_OR_LATER := 1
 Q_OR_LATER := 1
 endif # PLATFORM_VERSION == Q
+ifeq ($(PLATFORM_VERSION),R)
+P_OR_LATER := 1
+Q_OR_LATER := 1
+R_OR_LATER := 1
+endif # PLATFORM_VERSION == R
+ifeq ($(PLATFORM_VERSION),S)
+P_OR_LATER := 1
+Q_OR_LATER := 1
+R_OR_LATER := 1
+endif # PLATFORM_VERSION == S
 
 CPP_VERSION := c++14
 
@@ -166,6 +177,10 @@ LOCAL_SHARED_LIBRARIES+= \
         android.hardware.neuralnetworks@1.2
 endif # PLATFORM_VERSION == Q
 
+ifeq ($(R_OR_LATER),1)
+LOCAL_SHARED_LIBRARIES+= android.hardware.neuralnetworks@1.3
+endif # PLATFORM_VERSION == R
+
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
         libGLES_mali
@@ -279,6 +294,10 @@ LOCAL_SHARED_LIBRARIES+= \
         android.hardware.neuralnetworks@1.2
 endif # PLATFORM_VERSION == Q
 
+ifeq ($(R_OR_LATER),1)
+LOCAL_SHARED_LIBRARIES+= android.hardware.neuralnetworks@1.3
+endif # PLATFORM_VERSION == R
+
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
         libGLES_mali
@@ -387,6 +406,10 @@ LOCAL_SHARED_LIBRARIES := \
         android.hardware.neuralnetworks@1.1 \
         android.hardware.neuralnetworks@1.2
 
+ifeq ($(R_OR_LATER),1)
+LOCAL_SHARED_LIBRARIES+= android.hardware.neuralnetworks@1.3
+endif # PLATFORM_VERSION == R
+
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
         libGLES_mali
@@ -476,6 +499,9 @@ LOCAL_SHARED_LIBRARIES+= \
         libcutils \
         android.hardware.neuralnetworks@1.2
 endif # PLATFORM_VERSION == Q
+ifeq ($(R_OR_LATER),1)
+LOCAL_SHARED_LIBRARIES+= android.hardware.neuralnetworks@1.3
+endif # PLATFORM_VERSION == R
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
@@ -569,6 +595,10 @@ LOCAL_SHARED_LIBRARIES+= \
         libGLES_mali
 endif
 
+ifeq ($(R_OR_LATER),1)
+LOCAL_SHARED_LIBRARIES+= android.hardware.neuralnetworks@1.3
+endif # PLATFORM_VERSION == R
+
 include $(BUILD_EXECUTABLE)
 
 endif # PLATFORM_VERSION == 9
@@ -642,7 +672,8 @@ LOCAL_SHARED_LIBRARIES := \
         android.hidl.memory@1.0 \
         android.hardware.neuralnetworks@1.0 \
         android.hardware.neuralnetworks@1.1 \
-        android.hardware.neuralnetworks@1.2
+        android.hardware.neuralnetworks@1.2 \
+        android.hardware.neuralnetworks@1.3
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
 LOCAL_SHARED_LIBRARIES+= \
