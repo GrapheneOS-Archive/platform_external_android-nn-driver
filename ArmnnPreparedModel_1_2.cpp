@@ -375,7 +375,7 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
     // this is simpler and is what the CpuExecutor does.
     for (android::nn::RunTimePoolInfo& pool : *pMemPools)
     {
-        pool.update();
+        pool.flush();
     }
     ALOGV("ArmnnPreparedModel_1_2::executeSynchronously() after Execution");
 
@@ -571,7 +571,7 @@ void ArmnnPreparedModel_1_2<HalVersion>::ExecuteGraph(
     // this is simpler and is what the CpuExecutor does.
     for (android::nn::RunTimePoolInfo& pool : *pMemPools)
     {
-        pool.update();
+        pool.flush();
     }
 
     if (cb.measureTiming == MeasureTiming::YES)

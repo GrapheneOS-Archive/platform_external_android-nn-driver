@@ -279,7 +279,7 @@ void ArmnnPreparedModel<HalVersion>::ExecuteGraph(
     // this is simpler and is what the CpuExecutor does.
     for (android::nn::RunTimePoolInfo& pool : *pMemPools)
     {
-        pool.update();
+        pool.flush();
     }
 
     cb.callback(ErrorStatus::NONE, "ExecuteGraph");
