@@ -385,8 +385,8 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
         Timing timing;
         timing.timeOnDevice = MicrosecondsDuration(deviceEnd, deviceStart);
         timing.timeInDriver = MicrosecondsDuration(driverEnd, driverStart);
-        ALOGV("ArmnnPreparedModel_1_2::executeSynchronously timing Device = %lu Driver = %lu", timing.timeOnDevice,
-                timing.timeInDriver);
+        ALOGV("ArmnnPreparedModel_1_2::executeSynchronously timing Device = %" PRIu64 " Driver = %" PRIu64,
+                timing.timeOnDevice, timing.timeInDriver);
         cb(ErrorStatus::NONE, outputShapes, timing);
     }
     else
