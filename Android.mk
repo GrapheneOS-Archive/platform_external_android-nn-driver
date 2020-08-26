@@ -43,10 +43,10 @@ CPP_VERSION := c++17
 endif
 
 # Configure these paths if you move the source or Khronos headers
-ARMNN_HEADER_PATH := $(LOCAL_PATH)/armnn/include
-ARMNN_UTILS_HEADER_PATH := $(LOCAL_PATH)/armnn/src/armnnUtils
+ARMNN_HEADER_PATH := $(LOCAL_PATH)/../armnn/include
+ARMNN_UTILS_HEADER_PATH := $(LOCAL_PATH)/../armnn/src/armnnUtils
 OPENCL_HEADER_PATH := $(LOCAL_PATH)/clframework/include
-NN_HEADER_PATH := $(LOCAL_PATH)/../../../frameworks/ml/nn/runtime/include
+NN_HEADER_PATH := $(LOCAL_PATH)/../../frameworks/ml/nn/runtime/include
 
 # Variables to control CL/NEON/reference backend support
 # Set them to '0' to disable support for a specific backend
@@ -691,5 +691,5 @@ endif # PLATFORM_VERSION == Q
 ##########################
 # Note we use ANDROID_NN_DRIVER_LOCAL_PATH rather than LOCAL_PATH because LOCAL_PATH will be overwritten
 # when including other .mk files that set it.
-include $(ANDROID_NN_DRIVER_LOCAL_PATH)/armnn/Android.mk
-include $(ANDROID_NN_DRIVER_LOCAL_PATH)/test/Android.mk
+#include $(ANDROID_NN_DRIVER_LOCAL_PATH)/armnn/Android.mk
+#include $(ANDROID_NN_DRIVER_LOCAL_PATH)/test/Android.mk
