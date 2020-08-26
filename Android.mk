@@ -611,8 +611,8 @@ ifeq ($(Q_OR_LATER),1)
 #####################################################
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := android.hardware.neuralnetworks@1.2-service-armnn
-LOCAL_INIT_RC := android.hardware.neuralnetworks@1.2-service-armnn.rc
+LOCAL_MODULE := android.hardware.neuralnetworks@1.2-service-armnn-intree
+#LOCAL_INIT_RC := android.hardware.neuralnetworks@1.2-service-armnn.rc
 LOCAL_MODULE_TAGS := optional
 LOCAL_ARM_MODE := arm
 LOCAL_MODULE_RELATIVE_PATH := hw
