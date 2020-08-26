@@ -28,6 +28,12 @@
 #include <log/log.h>
 #include <vector>
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunneeded-internal-declaration"
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#endif
 namespace armnn_driver
 {
 
@@ -3701,3 +3707,6 @@ bool ConvertSpaceToBatchNd(const HalOperation& operation, const HalModel& model,
 }
 
 } // namespace armnn_driver
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
