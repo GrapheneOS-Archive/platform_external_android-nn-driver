@@ -19,16 +19,16 @@
 namespace armnn_driver
 {
 
-typedef std::function<void(::android::hardware::neuralnetworks::V1_0::ErrorStatus status,
-        std::vector<::android::hardware::neuralnetworks::V1_2::OutputShape> outputShapes,
-        const ::android::hardware::neuralnetworks::V1_2::Timing& timing,
+typedef std::function<void(V1_0::ErrorStatus status,
+        std::vector<V1_2::OutputShape> outputShapes,
+        const V1_2::Timing& timing,
         std::string callingFunction)> armnnExecuteCallback_1_2;
 
 struct ArmnnCallback_1_2
 {
     armnnExecuteCallback_1_2 callback;
     TimePoint driverStart;
-    MeasureTiming measureTiming;
+    V1_2::MeasureTiming measureTiming;
 };
 
 template <typename HalVersion>
@@ -45,14 +45,14 @@ public:
 
     virtual ~ArmnnPreparedModel_1_2();
 
-    virtual Return<ErrorStatus> execute(const Request& request,
+    virtual Return<V1_0::ErrorStatus> execute(const V1_0::Request& request,
                                         const sp<V1_0::IExecutionCallback>& callback) override;
 
-    virtual Return<ErrorStatus> execute_1_2(const Request& request, MeasureTiming measure,
+    virtual Return<V1_0::ErrorStatus>  execute_1_2(const V1_0::Request& request, V1_2::MeasureTiming measure,
                                             const sp<V1_2::IExecutionCallback>& callback) override;
 
-    virtual Return<void> executeSynchronously(const Request &request,
-                                              MeasureTiming measure,
+    virtual Return<void> executeSynchronously(const V1_0::Request &request,
+                                              V1_2::MeasureTiming measure,
                                               V1_2::IPreparedModel::executeSynchronously_cb cb) override;
 
     virtual Return<void> configureExecutionBurst(
@@ -72,8 +72,8 @@ public:
     bool ExecuteWithDummyInputs();
 
 private:
-    Return <ErrorStatus> Execute(const Request& request,
-                                 MeasureTiming measureTiming,
+    Return <V1_0::ErrorStatus> Execute(const V1_0::Request& request,
+                                 V1_2::MeasureTiming measureTiming,
                                  armnnExecuteCallback_1_2 callback);
 
     template <typename TensorBindingCollection>

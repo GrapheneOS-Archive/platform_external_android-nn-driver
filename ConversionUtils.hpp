@@ -375,7 +375,7 @@ void CalcPaddingTransposeConv(uint32_t output, uint32_t kernel, int32_t stride, 
 Shape GetOperandShape(const V1_0::Operand& operand)
 {
     Shape shape;
-    shape.type = OperandType(operand.type);
+    shape.type = android::nn::OperandType(operand.type);
     shape.dimensions = operand.dimensions;
     shape.scale = operand.scale;
     shape.offset = operand.zeroPoint;
@@ -387,7 +387,7 @@ Shape GetOperandShape(const V1_0::Operand& operand)
 Shape GetOperandShape(const V1_2::Operand& operand)
 {
     Shape shape;
-    shape.type = OperandType(operand.type);
+    shape.type = android::nn::OperandType(operand.type);
     shape.dimensions = operand.dimensions;
     shape.scale = operand.scale;
     shape.offset = operand.zeroPoint;
@@ -935,8 +935,8 @@ bool GetInputActivationFunctionImpl(const HalOperation& operation,
         return Fail("%s: unexpected operand type: %s (should be %s or %s)",
                     __func__,
                     toString(type).c_str(),
-                    toString(OperandType::INT32).c_str(),
-                    toString(OperandType::TENSOR_INT32).c_str());
+                    toString(HalOperandType::INT32).c_str(),
+                    toString(HalOperandType::TENSOR_INT32).c_str());
     }
 
     int32_t activationFunctionAsInt;

@@ -4,6 +4,7 @@
 //
 
 #include "ArmnnDriverImpl.hpp"
+#include "NamespaceAdaptor.hpp"
 #include "../SystemPropertiesUtils.hpp"
 
 #include <log/log.h>
@@ -47,7 +48,7 @@ Return<void> ArmnnDriverImpl::getCapabilities_1_1(const armnn::IRuntimePtr& runt
         capabilities.relaxedFloat32toFloat16Performance.execTime =
             ParseSystemProperty(g_RelaxedFloat32toFloat16PerformanceExecTime, .1f);
 
-        cb(ErrorStatus::NONE, capabilities);
+        cb(V1_0::ErrorStatus::NONE, capabilities);
     }
     else
     {
@@ -57,7 +58,7 @@ Return<void> ArmnnDriverImpl::getCapabilities_1_1(const armnn::IRuntimePtr& runt
         capabilities.quantized8Performance.powerUsage            = 0;
         capabilities.relaxedFloat32toFloat16Performance.execTime = 0;
 
-        cb(ErrorStatus::DEVICE_UNAVAILABLE, capabilities);
+        cb(V1_0::ErrorStatus::DEVICE_UNAVAILABLE, capabilities);
     }
 
     return Void();

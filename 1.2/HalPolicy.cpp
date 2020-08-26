@@ -26,9 +26,9 @@ using namespace armnn;
 namespace
 {
 
-bool IsQSymmDequantizeForWeights(const Operation& operation, const Model& model)
+bool IsQSymmDequantizeForWeights(const V1_2::Operation& operation, const V1_2::Model& model)
 {
-    const Operand* operand = GetInputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* operand = GetInputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!operand)
     {
         return false;
@@ -80,7 +80,7 @@ bool IsQSymmDequantizeForWeights(const Operation& operation, const Model& model)
 
 } // anonymous namespace
 
-bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertOperation(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     switch (operation.type)
     {
@@ -202,7 +202,7 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
     }
 }
 
-bool HalPolicy::ConvertAdd(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertAdd(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertAdd()");
     return ::ConvertAdd<hal_1_2::HalPolicy>(operation, model, data);
@@ -217,20 +217,20 @@ bool HalPolicy::ConvertArgMinMax(const V1_2::Operation& operation,
     return ::ConvertArgMinMax<hal_1_2::HalPolicy>(operation, model, data, argMinMaxFunction);
 }
 
-bool HalPolicy::ConvertAveragePool2d(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertAveragePool2d(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertAveragePool2d()");
     return ConvertPooling2d<hal_1_2::HalPolicy>(operation, __func__, PoolingAlgorithm::Average, model, data);
 }
 
-bool HalPolicy::ConvertBatchToSpaceNd(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertBatchToSpaceNd(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertBatchToSpaceNd()");
     return ::ConvertBatchToSpaceNd<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertComparison(const Operation& operation,
-                                  const Model& model,
+bool HalPolicy::ConvertComparison(const V1_2::Operation& operation,
+                                  const V1_2::Model& model,
                                   ConversionData& data,
                                   ComparisonOperation comparisonOperation)
 {
@@ -245,7 +245,7 @@ bool HalPolicy::ConvertComparison(const Operation& operation,
         return Fail("%s: Operation has invalid inputs", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Could not read output 0", __func__);
@@ -286,13 +286,13 @@ bool HalPolicy::ConvertComparison(const Operation& operation,
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertConcatenation(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertConcatenation(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertConcatenation()");
     return ::ConvertConcatenation<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertConv2d(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertConv2d(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertConv2d()");
 
@@ -302,7 +302,7 @@ bool HalPolicy::ConvertConv2d(const Operation& operation, const Model& model, Co
         return Fail("%s: Operation has invalid inputs", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Could not read output 0", __func__);
@@ -322,7 +322,7 @@ bool HalPolicy::ConvertConv2d(const Operation& operation, const Model& model, Co
     // Determine whether padding is implicit or explicit
     bool implicitPadding = operation.inputs.size() == 7 ||
                            (operation.inputs.size() >= 8 &&
-                            GetInputOperand<hal_1_2::HalPolicy>(operation, 7, model)->type == OperandType::BOOL);
+                            GetInputOperand<hal_1_2::HalPolicy>(operation, 7, model)->type == V1_2::OperandType::BOOL);
 
     if (implicitPadding)
     {
@@ -365,8 +365,8 @@ bool HalPolicy::ConvertConv2d(const Operation& operation, const Model& model, Co
     {
         android::nn::PaddingScheme paddingScheme;
         if (!GetInputPaddingScheme<hal_1_2::HalPolicy>(operation, 3, paddingScheme, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, OperandType::INT32, desc.m_StrideX, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, OperandType::INT32, desc.m_StrideY, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, V1_2::OperandType::INT32, desc.m_StrideX, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, V1_2::OperandType::INT32, desc.m_StrideY, model, data) ||
             !GetInputActivationFunction<hal_1_2::HalPolicy>(operation, 6, activation, model, data) ||
             !GetOptionalConvolutionDilationParams<hal_1_2::HalPolicy>(operation, 8, desc, model, data))
         {
@@ -388,12 +388,12 @@ bool HalPolicy::ConvertConv2d(const Operation& operation, const Model& model, Co
     else if (operation.inputs.size() >= 10)
     {
         // explicit padding
-        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 3, OperandType::INT32, desc.m_PadLeft, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, OperandType::INT32, desc.m_PadRight, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, OperandType::INT32, desc.m_PadTop, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, OperandType::INT32, desc.m_PadBottom, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 7, OperandType::INT32, desc.m_StrideX, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 8, OperandType::INT32, desc.m_StrideY, model, data) ||
+        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 3, V1_2::OperandType::INT32, desc.m_PadLeft, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, V1_2::OperandType::INT32, desc.m_PadRight, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, V1_2::OperandType::INT32, desc.m_PadTop, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, V1_2::OperandType::INT32, desc.m_PadBottom, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 7, V1_2::OperandType::INT32, desc.m_StrideX, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 8, V1_2::OperandType::INT32, desc.m_StrideY, model, data) ||
             !GetInputActivationFunction<hal_1_2::HalPolicy>(operation, 9, activation, model, data) ||
             !GetOptionalConvolutionDilationParams<hal_1_2::HalPolicy>(operation, 11, desc, model, data))
         {
@@ -444,13 +444,13 @@ bool HalPolicy::ConvertConv2d(const Operation& operation, const Model& model, Co
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *endLayer, model, data);
 }
 
-bool HalPolicy::ConvertDepthToSpace(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertDepthToSpace(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertDepthToSpace()");
     return ::ConvertDepthToSpace<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertDepthwiseConv2d(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertDepthwiseConv2d(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertDepthwiseConv2d()");
 
@@ -461,7 +461,7 @@ bool HalPolicy::ConvertDepthwiseConv2d(const Operation& operation, const Model& 
         return Fail("%s: Operation has invalid inputs", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
 
     if (!output)
     {
@@ -478,7 +478,7 @@ bool HalPolicy::ConvertDepthwiseConv2d(const Operation& operation, const Model& 
 
     // ArmNN does not currently support non-fixed weights or bias
     // Find the shape of the weights tensor. In AndroidNN this will be [ 1, H, W, I * M ]
-    const Operand* weightsOperand = GetInputOperand<hal_1_2::HalPolicy>(operation, 1, model);
+    const V1_2::Operand* weightsOperand = GetInputOperand<hal_1_2::HalPolicy>(operation, 1, model);
 
     if (weightsOperand == nullptr)
     {
@@ -496,7 +496,7 @@ bool HalPolicy::ConvertDepthwiseConv2d(const Operation& operation, const Model& 
     // Determine whether padding is implicit or explicit
     bool implicitPadding = operation.inputs.size() == 8 ||
         (operation.inputs.size() >= 9 &&
-        GetInputOperand<hal_1_2::HalPolicy>(operation, 8, model)->type == OperandType::BOOL);
+        GetInputOperand<hal_1_2::HalPolicy>(operation, 8, model)->type == V1_2::OperandType::BOOL);
 
     // Look ahead to find the optional DataLayout, if present
     const uint32_t dataLayoutFlagIndex = implicitPadding ? 8 : 11;
@@ -548,8 +548,8 @@ bool HalPolicy::ConvertDepthwiseConv2d(const Operation& operation, const Model& 
     {
         android::nn::PaddingScheme paddingScheme;
         if (!GetInputPaddingScheme<hal_1_2::HalPolicy>(operation, 3, paddingScheme, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, OperandType::INT32, desc.m_StrideX, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, OperandType::INT32, desc.m_StrideY, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, V1_2::OperandType::INT32, desc.m_StrideX, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, V1_2::OperandType::INT32, desc.m_StrideY, model, data) ||
             !GetInputActivationFunction<hal_1_2::HalPolicy>(operation, 7, activation, model, data) ||
             !GetOptionalConvolutionDilationParams<hal_1_2::HalPolicy>(operation, 9, desc, model, data))
         {
@@ -567,12 +567,12 @@ bool HalPolicy::ConvertDepthwiseConv2d(const Operation& operation, const Model& 
     else if (operation.inputs.size() >= 11)
     {
         // explicit padding
-        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 3, OperandType::INT32, desc.m_PadLeft, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, OperandType::INT32, desc.m_PadRight, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, OperandType::INT32, desc.m_PadTop, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, OperandType::INT32, desc.m_PadBottom, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 7, OperandType::INT32, desc.m_StrideX, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 8, OperandType::INT32, desc.m_StrideY, model, data) ||
+        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 3, V1_2::OperandType::INT32, desc.m_PadLeft, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, V1_2::OperandType::INT32, desc.m_PadRight, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, V1_2::OperandType::INT32, desc.m_PadTop, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, V1_2::OperandType::INT32, desc.m_PadBottom, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 7, V1_2::OperandType::INT32, desc.m_StrideX, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 8, V1_2::OperandType::INT32, desc.m_StrideY, model, data) ||
             !GetInputActivationFunction<hal_1_2::HalPolicy>(operation,  10, activation, model, data) ||
             !GetOptionalConvolutionDilationParams<hal_1_2::HalPolicy>(operation, 12, desc, model, data))
         {
@@ -622,7 +622,7 @@ bool HalPolicy::ConvertDepthwiseConv2d(const Operation& operation, const Model& 
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *endLayer, model, data);
 }
 
-bool HalPolicy::ConvertDequantize(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertDequantize(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertDequantize()");
 
@@ -636,14 +636,14 @@ bool HalPolicy::ConvertDequantize(const Operation& operation, const Model& model
     return ::ConvertDequantize<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertDiv(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertDiv(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertDiv()");
     return ::ConvertDiv<hal_1_2::HalPolicy>(operation, model, data);
 }
 
 bool HalPolicy::ConvertElementwiseUnary(const Operation& operation,
-                                        const Model& model,
+                                        const V1_2::Model& model,
                                         ConversionData& data,
                                         UnaryOperation unaryOperation)
 {
@@ -657,7 +657,7 @@ bool HalPolicy::ConvertElementwiseUnary(const Operation& operation,
         return Fail("%s: Operation has invalid input", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Could not read output 0", __func__);
@@ -695,7 +695,7 @@ bool HalPolicy::ConvertElementwiseUnary(const Operation& operation,
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertExpandDims(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertExpandDims(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertExpandDims()");
 
@@ -706,7 +706,7 @@ bool HalPolicy::ConvertExpandDims(const Operation& operation, const Model& model
         return Fail("%s: Operation has invalid input", __func__);
     }
 
-    const Operand* output = GetOutputOperand<HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Operation has invalid output", __func__);
@@ -719,7 +719,7 @@ bool HalPolicy::ConvertExpandDims(const Operation& operation, const Model& model
     }
 
     int32_t axis;
-    if (!GetInputScalar<HalPolicy>(operation, 1, OperandType::INT32, axis, model, data))
+    if (!GetInputScalar<HalPolicy>(operation, 1, V1_2::OperandType::INT32, axis, model, data))
     {
         return Fail("%s: failed to get axis input value", __func__);
     }
@@ -764,19 +764,19 @@ bool HalPolicy::ConvertExpandDims(const Operation& operation, const Model& model
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertFloor(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertFloor(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertFloor()");
     return ::ConvertFloor<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertFullyConnected(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertFullyConnected(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertFullyConnected()");
     return ::ConvertFullyConnected<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertGroupedConv2d(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertGroupedConv2d(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertGroupedConv2d()");
 
@@ -790,7 +790,7 @@ bool HalPolicy::ConvertGroupedConv2d(const Operation& operation, const Model& mo
     }
     const TensorInfo& inputInfo  = input.GetTensorInfo();
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Could not read output 0", __func__);
@@ -850,13 +850,13 @@ bool HalPolicy::ConvertGroupedConv2d(const Operation& operation, const Model& mo
 
     if (operation.inputs.size() == 12)
     {
-        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 3, OperandType::INT32, desc.m_PadLeft, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, OperandType::INT32, desc.m_PadRight, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, OperandType::INT32, desc.m_PadTop, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, OperandType::INT32, desc.m_PadBottom, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 7, OperandType::INT32, desc.m_StrideX, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 8, OperandType::INT32, desc.m_StrideY, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 9, OperandType::INT32, numGroups, model, data) ||
+        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 3, V1_2::OperandType::INT32, desc.m_PadLeft, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, V1_2::OperandType::INT32, desc.m_PadRight, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, V1_2::OperandType::INT32, desc.m_PadTop, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, V1_2::OperandType::INT32, desc.m_PadBottom, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 7, V1_2::OperandType::INT32, desc.m_StrideX, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 8, V1_2::OperandType::INT32, desc.m_StrideY, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 9, V1_2::OperandType::INT32, numGroups, model, data) ||
             !GetInputActivationFunction<hal_1_2::HalPolicy>(operation, 10, activation, model, data))
         {
             return Fail("%s: Operation has invalid inputs (explicit padding)", __func__);
@@ -867,9 +867,9 @@ bool HalPolicy::ConvertGroupedConv2d(const Operation& operation, const Model& mo
     {
         android::nn::PaddingScheme paddingScheme;
         if (!GetInputPaddingScheme<hal_1_2::HalPolicy>(operation, 3, paddingScheme, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, OperandType::INT32, desc.m_StrideX, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, OperandType::INT32, desc.m_StrideY, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, OperandType::INT32, numGroups, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, V1_2::OperandType::INT32, desc.m_StrideX, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, V1_2::OperandType::INT32, desc.m_StrideY, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, V1_2::OperandType::INT32, numGroups, model, data) ||
             !GetInputActivationFunction<hal_1_2::HalPolicy>(operation, 7, activation, model, data))
         {
             return Fail("%s: Operation has invalid inputs (implicit padding)", __func__);
@@ -1107,7 +1107,7 @@ bool HalPolicy::ConvertGroupedConv2d(const Operation& operation, const Model& mo
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *endLayer, model, data);
 }
 
-bool HalPolicy::ConvertInstanceNormalization(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertInstanceNormalization(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertInstanceNormalization()");
 
@@ -1117,7 +1117,7 @@ bool HalPolicy::ConvertInstanceNormalization(const Operation& operation, const M
         return Fail("%s: Operation has an invalid input 0", __func__);
     }
 
-    const Operand* output = GetOutputOperand<HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Operation has an invalid output", __func__);
@@ -1130,7 +1130,7 @@ bool HalPolicy::ConvertInstanceNormalization(const Operation& operation, const M
     }
 
     // Determine data type of input tensor
-    OperandType inputType;
+    V1_2::OperandType inputType;
     if (!GetOperandType<hal_1_2::HalPolicy>(operation, 0, model, inputType))
     {
         return Fail("%s: Operation has invalid inputs", __func__);
@@ -1139,15 +1139,15 @@ bool HalPolicy::ConvertInstanceNormalization(const Operation& operation, const M
     InstanceNormalizationDescriptor desc;
 
     // Read gamma, beta & epsilon
-    if (inputType == OperandType::TENSOR_FLOAT16)
+    if (inputType == V1_2::OperandType::TENSOR_FLOAT16)
     {
         Half fp16Gamma;
         Half fp16Beta;
         Half fp16Epsilon;
 
-        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 1, OperandType::FLOAT16, fp16Gamma, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 2, OperandType::FLOAT16, fp16Beta, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 3, OperandType::FLOAT16, fp16Epsilon, model, data))
+        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 1, V1_2::OperandType::FLOAT16, fp16Gamma, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 2, V1_2::OperandType::FLOAT16, fp16Beta, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 3, V1_2::OperandType::FLOAT16, fp16Epsilon, model, data))
         {
             return Fail("%s: Operation has invalid inputs (FLOAT16)", __func__);
         }
@@ -1156,11 +1156,11 @@ bool HalPolicy::ConvertInstanceNormalization(const Operation& operation, const M
         desc.m_Beta  = static_cast<float>(fp16Beta);
         desc.m_Eps   = static_cast<float>(fp16Epsilon);
     }
-    else if (inputType == OperandType::TENSOR_FLOAT32)
+    else if (inputType == V1_2::OperandType::TENSOR_FLOAT32)
     {
-        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 1, OperandType::FLOAT32, desc.m_Gamma, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 2, OperandType::FLOAT32, desc.m_Beta, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 3, OperandType::FLOAT32, desc.m_Eps, model, data))
+        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 1, V1_2::OperandType::FLOAT32, desc.m_Gamma, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 2, V1_2::OperandType::FLOAT32, desc.m_Beta, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 3, V1_2::OperandType::FLOAT32, desc.m_Eps, model, data))
         {
             return Fail("%s: Operation has invalid inputs (FLOAT32)", __func__);
         }
@@ -1191,33 +1191,33 @@ bool HalPolicy::ConvertInstanceNormalization(const Operation& operation, const M
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertL2Normalization(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertL2Normalization(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertL2Normalization()");
     return ::ConvertL2Normalization<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertL2Pool2d(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertL2Pool2d(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertL2Pool2d()");
     return ConvertPooling2d<hal_1_2::HalPolicy>(operation, __func__, PoolingAlgorithm::L2, model, data);
 }
 
 bool HalPolicy::ConvertLocalResponseNormalization(const Operation& operation,
-                                                  const Model& model,
+                                                  const V1_2::Model& model,
                                                   ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertLocalResponseNormalization()");
     return ::ConvertLocalResponseNormalization<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertLogistic(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertLogistic(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertLogistic()");
     return ::ConvertLogistic<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertLogSoftmax(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertLogSoftmax(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertLogSoftmax()");
 
@@ -1227,7 +1227,7 @@ bool HalPolicy::ConvertLogSoftmax(const Operation& operation, const Model& model
         return Fail("%s: Failed to read input 0", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Failed to read output", __func__);
@@ -1240,7 +1240,7 @@ bool HalPolicy::ConvertLogSoftmax(const Operation& operation, const Model& model
     }
 
     // Determine data type of input tensor
-    OperandType inputType;
+    V1_2::OperandType inputType;
     if (!GetOperandType<hal_1_2::HalPolicy>(operation, 0, model, inputType))
     {
         return Fail("%s: Operation has invalid inputs", __func__);
@@ -1249,19 +1249,19 @@ bool HalPolicy::ConvertLogSoftmax(const Operation& operation, const Model& model
     LogSoftmaxDescriptor descriptor;
 
     // Read beta
-    if (inputType == OperandType::TENSOR_FLOAT16)
+    if (inputType == V1_2::OperandType::TENSOR_FLOAT16)
     {
         Half fp16Beta;
-        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 1, OperandType::FLOAT16, fp16Beta, model, data))
+        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 1, V1_2::OperandType::FLOAT16, fp16Beta, model, data))
         {
             return Fail("%s: Failed to read input 1 (FLOAT16)", __func__);
         }
 
         descriptor.m_Beta  = static_cast<float>(fp16Beta);
     }
-    else if (inputType == OperandType::TENSOR_FLOAT32)
+    else if (inputType == V1_2::OperandType::TENSOR_FLOAT32)
     {
-        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 1, OperandType::FLOAT32, descriptor.m_Beta, model, data))
+        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 1, V1_2::OperandType::FLOAT32, descriptor.m_Beta, model, data))
         {
             return Fail("%s: Failed to read input 1 (FLOAT32)", __func__);
         }
@@ -1301,13 +1301,13 @@ bool HalPolicy::ConvertLogSoftmax(const Operation& operation, const Model& model
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertMaxPool2d(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertMaxPool2d(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertMaxPool2d()");
     return ConvertPooling2d<hal_1_2::HalPolicy>(operation, __func__, PoolingAlgorithm::Max, model, data);
 }
 
-bool HalPolicy::ConvertMaximum(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertMaximum(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertMaximum()");
 
@@ -1319,7 +1319,7 @@ bool HalPolicy::ConvertMaximum(const Operation& operation, const Model& model, C
         return Fail("%s: Operation has invalid inputs", __func__);
     }
 
-    const Operand* outputOperand = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* outputOperand = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!outputOperand)
     {
         return Fail("%s: Could not read output", __func__);
@@ -1356,13 +1356,13 @@ bool HalPolicy::ConvertMaximum(const Operation& operation, const Model& model, C
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertMean(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertMean(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertMean()");
     return ::ConvertMean<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertMinimum(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertMinimum(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertMinimum()");
 
@@ -1374,7 +1374,7 @@ bool HalPolicy::ConvertMinimum(const Operation& operation, const Model& model, C
         return Fail("%s: Operation has invalid inputs", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Could not read output 0", __func__);
@@ -1411,19 +1411,19 @@ bool HalPolicy::ConvertMinimum(const Operation& operation, const Model& model, C
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertMul(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertMul(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertMul()");
     return ::ConvertMul<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertPad(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertPad(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertPad()");
     return ::ConvertPad<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertPadV2(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertPadV2(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertPadV2()");
 
@@ -1433,7 +1433,7 @@ bool HalPolicy::ConvertPadV2(const Operation& operation, const Model& model, Con
         return Fail("%s: Could not read input 0", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Could not read output", __func__);
@@ -1455,8 +1455,8 @@ bool HalPolicy::ConvertPadV2(const Operation& operation, const Model& model, Con
     }
 
     // Determine type of padding value
-    OperandType operandType0;
-    OperandType operandType2;
+    V1_2::OperandType operandType0;
+    V1_2::OperandType operandType2;
 
     if (!GetOperandType<hal_1_2::HalPolicy>(operation, 0, model, operandType0) ||
         !GetOperandType<hal_1_2::HalPolicy>(operation, 2, model, operandType2))
@@ -1465,7 +1465,7 @@ bool HalPolicy::ConvertPadV2(const Operation& operation, const Model& model, Con
     }
 
     // Read value to use for padding
-    if (operandType0 == OperandType::TENSOR_FLOAT16 && operandType2 == OperandType::FLOAT16)
+    if (operandType0 == V1_2::OperandType::TENSOR_FLOAT16 && operandType2 == V1_2::OperandType::FLOAT16)
     {
         Half f16PadValue;
         if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 2, operandType2, f16PadValue, model, data))
@@ -1475,14 +1475,14 @@ bool HalPolicy::ConvertPadV2(const Operation& operation, const Model& model, Con
 
         descriptor.m_PadValue = f16PadValue;
     }
-    else if (operandType0 == OperandType::TENSOR_FLOAT32 && operandType2 == OperandType::FLOAT32)
+    else if (operandType0 == V1_2::OperandType::TENSOR_FLOAT32 && operandType2 == V1_2::OperandType::FLOAT32)
     {
         if (!GetInputFloat32<hal_1_2::HalPolicy>(operation, 2, descriptor.m_PadValue, model, data))
         {
             return Fail("%s: Could not read input 2 (FLOAT32)", __func__);
         }
     }
-    else if (operandType0 == OperandType::TENSOR_QUANT8_ASYMM && operandType2 == OperandType::INT32)
+    else if (operandType0 == V1_2::OperandType::TENSOR_QUANT8_ASYMM && operandType2 == V1_2::OperandType::INT32)
     {
         int32_t intPadValue = 0;
         if (!GetInputInt32<hal_1_2::HalPolicy>(operation, 2, intPadValue, model, data))
@@ -1517,7 +1517,7 @@ bool HalPolicy::ConvertPadV2(const Operation& operation, const Model& model, Con
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertPrelu(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertPrelu(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertPrelu()");
 
@@ -1529,7 +1529,7 @@ bool HalPolicy::ConvertPrelu(const Operation& operation, const Model& model, Con
         return Fail("%s: Operation has invalid inputs", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
 
     if (!output)
     {
@@ -1574,7 +1574,7 @@ bool HalPolicy::ConvertPrelu(const Operation& operation, const Model& model, Con
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertQuantize(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertQuantize(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertQuantize()");
 
@@ -1584,7 +1584,7 @@ bool HalPolicy::ConvertQuantize(const Operation& operation, const Model& model, 
         return Fail("%s: Operation has invalid input", __func__);
     }
 
-    const Operand* const outputOperand = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* const outputOperand = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!outputOperand)
     {
         return Fail("%s: Operation has invalid outputs", __func__);
@@ -1615,7 +1615,7 @@ bool HalPolicy::ConvertQuantize(const Operation& operation, const Model& model, 
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertQuantizedLstm(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertQuantizedLstm(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertQuantizedLstm()");
 
@@ -1739,7 +1739,7 @@ bool HalPolicy::ConvertQuantizedLstm(const Operation& operation, const Model& mo
     // 0: The cell state: A 2-D tensor of type ANEURALNETWORKS_TENSOR_QUANT16_SYMM and shape [numBatches, outputSize]
     //    which contains a cell state from the current time step. Tensor is quantized using a quantization range
     //    of -2^4, 2^4 * 32767/32768.
-    const Operand* cellStateOut = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* cellStateOut = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!cellStateOut)
     {
         return Fail("%s: Could not read output 0: cellStateOut", __func__);
@@ -1747,7 +1747,7 @@ bool HalPolicy::ConvertQuantizedLstm(const Operation& operation, const Model& mo
 
     // 1: The output: A 2-D tensor of type ANEURALNETWORKS_TENSOR_QUANT8_ASYMM and shape [numBathes, outputSize] which
     //      contains the output value. Tensor is quantized with a fixed quantization range of -1, 127/128.
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 1, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 1, model);
     if (!output)
     {
         return Fail("%s: Could not read output 1: output", __func__);
@@ -1823,32 +1823,32 @@ bool HalPolicy::ConvertQuantizedLstm(const Operation& operation, const Model& mo
             SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 1, *layer, 1, model, data));
 }
 
-bool HalPolicy::ConvertReLu(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertReLu(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertReLu()");
     return ::ConvertReLu<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertReLu1(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertReLu1(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertReLu1()");
     return ::ConvertReLu1<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertReLu6(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertReLu6(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertReLu6()");
     return ::ConvertReLu6<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertReshape(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertReshape(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertReshape()");
     return ::ConvertReshape<hal_1_2::HalPolicy>(operation, model, data);
 }
 
 bool HalPolicy::ConvertResize(const Operation& operation,
-                              const Model& model,
+                              const V1_2::Model& model,
                               ConversionData& data,
                               ResizeMethod resizeMethod)
 {
@@ -1861,7 +1861,7 @@ bool HalPolicy::ConvertResize(const Operation& operation,
         return Fail("%s: Could not read input 0", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Could not read output 0", __func__);
@@ -1879,8 +1879,8 @@ bool HalPolicy::ConvertResize(const Operation& operation,
     descriptor.m_Method     = resizeMethod;
     descriptor.m_DataLayout = OptionalDataLayout<hal_1_2::HalPolicy>(operation, 3, model, data);
 
-    OperandType operandType1;
-    OperandType operandType2;
+    V1_2::OperandType operandType1;
+    V1_2::OperandType operandType2;
 
     if (!GetOperandType<hal_1_2::HalPolicy>(operation, 1, model, operandType1) ||
         !GetOperandType<hal_1_2::HalPolicy>(operation, 2, model, operandType2))
@@ -1893,7 +1893,7 @@ bool HalPolicy::ConvertResize(const Operation& operation,
         return Fail("%s: Operation has invalid inputs. Type of input 1 and 2 should be the same", __func__);
     }
 
-    if (operandType1 == OperandType::INT32)
+    if (operandType1 == V1_2::OperandType::INT32)
     {
         // Case 1: resizing by shape
         int32_t targetWidth  = 0;
@@ -1914,7 +1914,7 @@ bool HalPolicy::ConvertResize(const Operation& operation,
         descriptor.m_TargetWidth = static_cast<uint32_t>(targetWidth);
         descriptor.m_TargetHeight = static_cast<uint32_t>(targetHeight);
     }
-    else if (operandType1 == OperandType::FLOAT32)
+    else if (operandType1 == V1_2::OperandType::FLOAT32)
     {
         // Case 2: resizing by scale
         float widthScale  = 1.0f;
@@ -1935,7 +1935,7 @@ bool HalPolicy::ConvertResize(const Operation& operation,
         descriptor.m_TargetWidth  = std::floor(width  * widthScale);
         descriptor.m_TargetHeight = std::floor(height * heightScale);
     }
-    else if (operandType1 == OperandType::FLOAT16)
+    else if (operandType1 == V1_2::OperandType::FLOAT16)
     {
         Half widthScale;
         Half heightScale;
@@ -1983,13 +1983,13 @@ bool HalPolicy::ConvertResize(const Operation& operation,
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertSpaceToBatchNd(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertSpaceToBatchNd(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertSpaceToBatchNd()");
     return ::ConvertSpaceToBatchNd<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertSpaceToDepth(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertSpaceToDepth(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertSpaceToDepth()");
 
@@ -2006,7 +2006,7 @@ bool HalPolicy::ConvertSpaceToDepth(const Operation& operation, const Model& mod
         return Fail("%s: Only inputs with rank 4 are supported", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!output)
     {
         return Fail("%s: Could not read output 0", __func__);
@@ -2020,7 +2020,7 @@ bool HalPolicy::ConvertSpaceToDepth(const Operation& operation, const Model& mod
 
     SpaceToDepthDescriptor desc;
 
-    GetInputScalar<hal_1_2::HalPolicy>(operation, 1, OperandType::INT32, desc.m_BlockSize, model, data);
+    GetInputScalar<hal_1_2::HalPolicy>(operation, 1, V1_2::OperandType::INT32, desc.m_BlockSize, model, data);
 
     if (desc.m_BlockSize <= 1)
     {
@@ -2049,7 +2049,7 @@ bool HalPolicy::ConvertSpaceToDepth(const Operation& operation, const Model& mod
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertSoftmax(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertSoftmax(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertSoftmax()");
 
@@ -2059,7 +2059,7 @@ bool HalPolicy::ConvertSoftmax(const Operation& operation, const Model& model, C
         return Fail("%s: Operation has invalid inputs", __func__);
     }
 
-    const Operand* outputOperand = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* outputOperand = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
     if (!outputOperand)
     {
         return Fail("%s: Operation has no outputs", __func__);
@@ -2114,13 +2114,13 @@ bool HalPolicy::ConvertSoftmax(const Operation& operation, const Model& model, C
     return SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 0, *layer, model, data);
 }
 
-bool HalPolicy::ConvertSub(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertSub(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertSub()");
     return ::ConvertSub<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertTanH(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertTanH(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertTanH()");
     return ::ConvertTanH<hal_1_2::HalPolicy>(operation, model, data);
@@ -2156,7 +2156,7 @@ bool SetupAndTrackLayerOutputSlotAndOverrideTensorInfo(const HalOperation& opera
 }
 
 
-bool HalPolicy::ConvertLstm(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertLstm(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertLstm()");
 
@@ -2295,8 +2295,8 @@ bool HalPolicy::ConvertLstm(const Operation& operation, const Model& model, Conv
     float cellClip;
     float projClip;
     if (!GetInputActivationFunctionFromTensor<hal_1_2::HalPolicy>(operation, 20, activation, model, data) ||
-        !GetInputScalar<hal_1_2::HalPolicy>(operation, 21, OperandType::FLOAT32, cellClip, model, data) ||
-        !GetInputScalar<hal_1_2::HalPolicy>(operation, 22, OperandType::FLOAT32, projClip, model, data))
+        !GetInputScalar<hal_1_2::HalPolicy>(operation, 21, V1_2::OperandType::FLOAT32, cellClip, model, data) ||
+        !GetInputScalar<hal_1_2::HalPolicy>(operation, 22, V1_2::OperandType::FLOAT32, projClip, model, data))
     {
         return Fail("%s: Operation has invalid scalar inputs", __func__);
     }
@@ -2349,20 +2349,20 @@ bool HalPolicy::ConvertLstm(const Operation& operation, const Model& model, Conv
         return Fail("%s: Could not read output 0: scratchBuffer", __func__);
     }
     // 01: The output state (out): A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32, of shape [batch_size, output_size].
-    const Operand* outputStateOut = GetOutputOperand<hal_1_2::HalPolicy>(operation, 1, model);
+    const V1_2::Operand* outputStateOut = GetOutputOperand<hal_1_2::HalPolicy>(operation, 1, model);
     if (!outputStateOut)
     {
         return Fail("%s: Could not read output 1: outputStateOut", __func__);
     }
     // 02: The cell state (out): A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32, of shape [batch_size, num_units].
-    const Operand* cellStateOut = GetOutputOperand<hal_1_2::HalPolicy>(operation, 2, model);
+    const V1_2::Operand* cellStateOut = GetOutputOperand<hal_1_2::HalPolicy>(operation, 2, model);
     if (!cellStateOut)
     {
         return Fail("%s: Could not read output 2: cellStateOut", __func__);
     }
     // 03: The output: A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32, of shape [batch_size, output_size]. This is
     //     effectively the same as the current “output state (out)” value.
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 3, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 3, model);
     if (!output)
     {
         return Fail("%s: Could not read output 3: output", __func__);
@@ -2572,7 +2572,7 @@ bool HalPolicy::ConvertLstm(const Operation& operation, const Model& model, Conv
             SetupAndTrackLayerOutputSlot<hal_1_2::HalPolicy>(operation, 3, *layer, 3, model, data));
 }
 
-bool HalPolicy::ConvertSqrt(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertSqrt(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertSqrt()");
     ActivationDescriptor desc;
@@ -2581,25 +2581,25 @@ bool HalPolicy::ConvertSqrt(const Operation& operation, const Model& model, Conv
     return ::ConvertToActivation<hal_1_2::HalPolicy>(operation, __func__, desc, model, data);
 }
 
-bool HalPolicy::ConvertSqueeze(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertSqueeze(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertSqueeze()");
     return ::ConvertSqueeze<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertStridedSlice(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertStridedSlice(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertStridedSlice()");
     return ::ConvertStridedSlice<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertTranspose(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertTranspose(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     ALOGV("hal_1_2::HalPolicy::ConvertTranspose()");
     return ::ConvertTranspose<hal_1_2::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertTransposeConv2d(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertTransposeConv2d(const V1_2::Operation& operation, const V1_2::Model& model, ConversionData& data)
 {
     LayerInputHandle input = ConvertToLayerInputHandle<hal_1_2::HalPolicy>(operation, 0, model, data);
 
@@ -2608,7 +2608,7 @@ bool HalPolicy::ConvertTransposeConv2d(const Operation& operation, const Model& 
         return Fail("%s: Operation has invalid inputs", __func__);
     }
 
-    const Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
+    const V1_2::Operand* output = GetOutputOperand<hal_1_2::HalPolicy>(operation, 0, model);
 
     if (!output)
     {
@@ -2624,7 +2624,7 @@ bool HalPolicy::ConvertTransposeConv2d(const Operation& operation, const Model& 
 
     // ArmNN does not currently support non-fixed weights or bias
     // Find the shape of the weights tensor. In AndroidNN this will be [ 1, H, W, I * M ]
-    const Operand* weightsOperand = GetInputOperand<hal_1_2::HalPolicy>(operation, 1, model);
+    const V1_2::Operand* weightsOperand = GetInputOperand<hal_1_2::HalPolicy>(operation, 1, model);
 
     if (weightsOperand == nullptr)
     {
@@ -2688,8 +2688,8 @@ bool HalPolicy::ConvertTransposeConv2d(const Operation& operation, const Model& 
 
         android::nn::PaddingScheme paddingScheme;
         if (!GetInputPaddingScheme<hal_1_2::HalPolicy>(operation, 4, paddingScheme, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, OperandType::INT32, strideX, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, OperandType::INT32, strideY, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, V1_2::OperandType::INT32, strideX, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, V1_2::OperandType::INT32, strideY, model, data) ||
             !GetInputActivationFunction<hal_1_2::HalPolicy>(operation, 7, activation, model, data))
         {
             return Fail("%s: Operation has invalid inputs (implicit padding)", __func__);
@@ -2720,12 +2720,12 @@ bool HalPolicy::ConvertTransposeConv2d(const Operation& operation, const Model& 
     else if (operation.inputs.size() == 11)
     {
         // explicit padding
-        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 3, OperandType::INT32, desc.m_PadLeft, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, OperandType::INT32, desc.m_PadRight, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, OperandType::INT32, desc.m_PadTop, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, OperandType::INT32, desc.m_PadBottom, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 7, OperandType::INT32, desc.m_StrideX, model, data) ||
-            !GetInputScalar<hal_1_2::HalPolicy>(operation, 8, OperandType::INT32, desc.m_StrideY, model, data) ||
+        if (!GetInputScalar<hal_1_2::HalPolicy>(operation, 3, V1_2::OperandType::INT32, desc.m_PadLeft, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 4, V1_2::OperandType::INT32, desc.m_PadRight, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 5, V1_2::OperandType::INT32, desc.m_PadTop, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 6, V1_2::OperandType::INT32, desc.m_PadBottom, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 7, V1_2::OperandType::INT32, desc.m_StrideX, model, data) ||
+            !GetInputScalar<hal_1_2::HalPolicy>(operation, 8, V1_2::OperandType::INT32, desc.m_StrideY, model, data) ||
             !GetInputActivationFunction<hal_1_2::HalPolicy>(operation,  9, activation, model, data))
         {
             return Fail("%s: Operation has invalid inputs (explicit padding)", __func__);

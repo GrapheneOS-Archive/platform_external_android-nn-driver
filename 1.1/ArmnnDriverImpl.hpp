@@ -7,6 +7,7 @@
 
 #include <HalInterfaces.h>
 
+#include "NamespaceAdaptor.hpp"
 #include "../DriverOptions.hpp"
 
 #include <armnn/ArmNN.hpp>

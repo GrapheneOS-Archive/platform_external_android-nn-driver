@@ -9,6 +9,7 @@
 #include <CpuExecutor.h>
 #include <HalInterfaces.h>
 #include <NeuralNetworks.h>
+#include "NamespaceAdaptor.hpp"
 
 #include <boost/format.hpp>
 #include <log/log.h>
@@ -17,12 +18,6 @@
 #include <string>
 #include <fstream>
 #include <iomanip>
-
-namespace V1_0 = ::android::hardware::neuralnetworks::V1_0;
-
-#ifdef ARMNN_ANDROID_NN_V1_2 // Using ::android::hardware::neuralnetworks::V1_2
-namespace V1_2 = ::android::hardware::neuralnetworks::V1_2;
-#endif
 
 namespace armnn_driver
 {
@@ -46,7 +41,7 @@ void SwizzleAndroidNn4dTensorToArmNn(const armnn::TensorInfo& tensor, const void
                                      const armnn::PermutationVector& mappings);
 
 /// Returns a pointer to a specific location in a pool
-void* GetMemoryFromPool(DataLocation location,
+void* GetMemoryFromPool(V1_0::DataLocation location,
                         const std::vector<android::nn::RunTimePoolInfo>& memPools);
 
 /// Can throw UnsupportedOperand

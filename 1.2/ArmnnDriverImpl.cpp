@@ -57,7 +57,7 @@ const char *g_OperandTypeInt32PerformancePowerUsage         = "Armnn.operandType
 
 
 void NotifyCallbackAndCheck(const sp<V1_2::IPreparedModelCallback>& callback,
-                            ErrorStatus errorStatus,
+                            V1_0::ErrorStatus errorStatus,
                             const sp<V1_2::IPreparedModel>& preparedModelPtr)
 {
     Return<void> returned = callback->notify_1_2(errorStatus, preparedModelPtr);
@@ -69,7 +69,7 @@ void NotifyCallbackAndCheck(const sp<V1_2::IPreparedModelCallback>& callback,
     }
 }
 
-Return<ErrorStatus> FailPrepareModel(ErrorStatus error,
+Return<V1_0::ErrorStatus> FailPrepareModel(V1_0::ErrorStatus error,
                                      const std::string& message,
                                      const sp<V1_2::IPreparedModelCallback>& callback)
 {
@@ -85,7 +85,7 @@ namespace armnn_driver
 namespace hal_1_2
 {
 
-Return<ErrorStatus> ArmnnDriverImpl::prepareArmnnModel_1_2(const armnn::IRuntimePtr& runtime,
+Return<V1_0::ErrorStatus> ArmnnDriverImpl::prepareArmnnModel_1_2(const armnn::IRuntimePtr& runtime,
                                                            const armnn::IGpuAccTunedParametersPtr& clTunedParameters,
                                                            const DriverOptions& options,
                                                            const V1_2::Model& model,
@@ -97,17 +97,17 @@ Return<ErrorStatus> ArmnnDriverImpl::prepareArmnnModel_1_2(const armnn::IRuntime
     if (cb.get() == nullptr)
     {
         ALOGW("ArmnnDriverImpl::prepareModel: Invalid callback passed to prepareModel");
-        return ErrorStatus::INVALID_ARGUMENT;
+        return V1_0::ErrorStatus::INVALID_ARGUMENT;
     }
 
     if (!runtime)
     {
-        return FailPrepareModel(ErrorStatus::DEVICE_UNAVAILABLE, "Device unavailable", cb);
+        return FailPrepareModel(V1_0::ErrorStatus::DEVICE_UNAVAILABLE, "Device unavailable", cb);
     }
 
     if (!android::nn::validateModel(model))
     {
-        return FailPrepareModel(ErrorStatus::INVALID_ARGUMENT, "Invalid model passed as input", cb);
+        return FailPrepareModel(V1_0::ErrorStatus::INVALID_ARGUMENT, "Invalid model passed as input", cb);
     }
 
     // Deliberately ignore any unsupported operations requested by the options -
@@ -120,8 +120,8 @@ Return<ErrorStatus> ArmnnDriverImpl::prepareArmnnModel_1_2(const armnn::IRuntime
 
     if (modelConverter.GetConversionResult() != ConversionResult::Success)
     {
-        FailPrepareModel(ErrorStatus::GENERAL_FAILURE, "ModelToINetworkConverter failed", cb);
-        return ErrorStatus::NONE;
+        FailPrepareModel(V1_0::ErrorStatus::GENERAL_FAILURE, "ModelToINetworkConverter failed", cb);
+        return V1_0::ErrorStatus::NONE;
     }
 
     // Optimize the network
@@ -142,8 +142,8 @@ Return<ErrorStatus> ArmnnDriverImpl::prepareArmnnModel_1_2(const armnn::IRuntime
     {
         std::stringstream message;
         message << "Exception (" << e.what() << ") caught from optimize.";
-        FailPrepareModel(ErrorStatus::GENERAL_FAILURE, message.str(), cb);
-        return ErrorStatus::NONE;
+        FailPrepareModel(V1_0::ErrorStatus::GENERAL_FAILURE, message.str(), cb);
+        return V1_0::ErrorStatus::NONE;
     }
 
     // Check that the optimized network is valid.
@@ -155,8 +155,8 @@ Return<ErrorStatus> ArmnnDriverImpl::prepareArmnnModel_1_2(const armnn::IRuntime
         {
             message << "\n" << msg;
         }
-        FailPrepareModel(ErrorStatus::GENERAL_FAILURE, message.str(), cb);
-        return ErrorStatus::NONE;
+        FailPrepareModel(V1_0::ErrorStatus::GENERAL_FAILURE, message.str(), cb);
+        return V1_0::ErrorStatus::NONE;
     }
 
     // Export the optimized network graph to a dot file if an output dump directory
@@ -170,15 +170,15 @@ Return<ErrorStatus> ArmnnDriverImpl::prepareArmnnModel_1_2(const armnn::IRuntime
     {
         if (runtime->LoadNetwork(netId, move(optNet)) != armnn::Status::Success)
         {
-            return FailPrepareModel(ErrorStatus::GENERAL_FAILURE, "Network could not be loaded", cb);
+            return FailPrepareModel(V1_0::ErrorStatus::GENERAL_FAILURE, "Network could not be loaded", cb);
         }
     }
     catch (std::exception& e)
     {
         std::stringstream message;
         message << "Exception (" << e.what()<< ") caught from LoadNetwork.";
-        FailPrepareModel(ErrorStatus::GENERAL_FAILURE, message.str(), cb);
-        return ErrorStatus::NONE;
+        FailPrepareModel(V1_0::ErrorStatus::GENERAL_FAILURE, message.str(), cb);
+        return V1_0::ErrorStatus::NONE;
     }
 
     // Now that we have a networkId for the graph rename the dump file to use it
@@ -199,7 +199,7 @@ Return<ErrorStatus> ArmnnDriverImpl::prepareArmnnModel_1_2(const armnn::IRuntime
     // this is enabled) before the first 'real' inference which removes the overhead of the first inference.
     if (!preparedModel->ExecuteWithDummyInputs())
     {
-        return FailPrepareModel(ErrorStatus::GENERAL_FAILURE, "Network could not be executed", cb);
+        return FailPrepareModel(V1_0::ErrorStatus::GENERAL_FAILURE, "Network could not be executed", cb);
     }
 
     if (clTunedParameters &&
@@ -217,9 +217,9 @@ Return<ErrorStatus> ArmnnDriverImpl::prepareArmnnModel_1_2(const armnn::IRuntime
         }
     }
 
-    NotifyCallbackAndCheck(cb, ErrorStatus::NONE, preparedModel.release());
+    NotifyCallbackAndCheck(cb, V1_0::ErrorStatus::NONE, preparedModel.release());
 
-    return ErrorStatus::NONE;
+    return V1_0::ErrorStatus::NONE;
 }
 
 Return<void> ArmnnDriverImpl::getCapabilities_1_2(const armnn::IRuntimePtr& runtime,
@@ -240,52 +240,52 @@ Return<void> ArmnnDriverImpl::getCapabilities_1_2(const armnn::IRuntimePtr& runt
                 ParseSystemProperty(g_RelaxedFloat32toFloat16PerformancePowerUsage, defaultValue);
 
         // Set the base value for all operand types
-        capabilities.operandPerformance = nonExtensionOperandPerformance({FLT_MAX, FLT_MAX});
+        capabilities.operandPerformance = ::android::nn::nonExtensionOperandPerformance<android::nn::HalVersion::V1_2>({FLT_MAX, FLT_MAX});
 
         // Load supported operand types
-        update(&capabilities.operandPerformance, OperandType::TENSOR_FLOAT32,
+        update(&capabilities.operandPerformance, V1_2::OperandType::TENSOR_FLOAT32,
                 {
                     .execTime = ParseSystemProperty(g_OperandTypeTensorFloat32PerformanceExecTime, defaultValue),
                     .powerUsage = ParseSystemProperty(g_OperandTypeTensorFloat32PerformancePowerUsage, defaultValue)
                 });
 
-        update(&capabilities.operandPerformance, OperandType::FLOAT32,
+        update(&capabilities.operandPerformance, V1_2::OperandType::FLOAT32,
                 {
                     .execTime = ParseSystemProperty(g_OperandTypeFloat32PerformanceExecTime, defaultValue),
                     .powerUsage = ParseSystemProperty(g_OperandTypeFloat32PerformancePowerUsage, defaultValue)
                 });
 
-        update(&capabilities.operandPerformance, OperandType::TENSOR_FLOAT16,
+        update(&capabilities.operandPerformance, V1_2::OperandType::TENSOR_FLOAT16,
                 {
                     .execTime = ParseSystemProperty(g_OperandTypeTensorFloat16PerformanceExecTime, defaultValue),
                     .powerUsage = ParseSystemProperty(g_OperandTypeTensorFloat16PerformancePowerUsage, defaultValue)
                 });
 
-        update(&capabilities.operandPerformance, OperandType::FLOAT16,
+        update(&capabilities.operandPerformance, V1_2::OperandType::FLOAT16,
                 {
                     .execTime = ParseSystemProperty(g_OperandTypeFloat16PerformanceExecTime, defaultValue),
                     .powerUsage = ParseSystemProperty(g_OperandTypeFloat16PerformancePowerUsage, defaultValue)
                 });
 
-        update(&capabilities.operandPerformance, OperandType::TENSOR_QUANT8_ASYMM,
+        update(&capabilities.operandPerformance, V1_2::OperandType::TENSOR_QUANT8_ASYMM,
                 {
                     .execTime = ParseSystemProperty(g_OperandTypeTensorQuant8AsymmPerformanceExecTime, defaultValue),
                     .powerUsage = ParseSystemProperty(g_OperandTypeTensorQuant8AsymmPerformancePowerUsage, defaultValue)
                 });
 
-        update(&capabilities.operandPerformance, OperandType::TENSOR_QUANT8_SYMM,
+        update(&capabilities.operandPerformance, V1_2::OperandType::TENSOR_QUANT8_SYMM,
                 {
                     .execTime = ParseSystemProperty(g_OperandTypeTensorQuant8SymmPerformanceExecTime, defaultValue),
                     .powerUsage = ParseSystemProperty(g_OperandTypeTensorQuant8SymmPerformancePowerUsage, defaultValue)
                 });
 
-        update(&capabilities.operandPerformance, OperandType::TENSOR_QUANT16_SYMM,
+        update(&capabilities.operandPerformance, V1_2::OperandType::TENSOR_QUANT16_SYMM,
                 {
                     .execTime = ParseSystemProperty(g_OperandTypeTensorQuant16SymmPerformanceExecTime, defaultValue),
                     .powerUsage = ParseSystemProperty(g_OperandTypeTensorQuant16SymmPerformancePowerUsage, defaultValue)
                 });
 
-        update(&capabilities.operandPerformance, OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL,
+        update(&capabilities.operandPerformance, V1_2::OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL,
                {
                    .execTime =
                    ParseSystemProperty(g_OperandTypeTensorQuant8SymmPerChannelPerformanceExecTime, defaultValue),
@@ -293,19 +293,19 @@ Return<void> ArmnnDriverImpl::getCapabilities_1_2(const armnn::IRuntimePtr& runt
                    ParseSystemProperty(g_OperandTypeTensorQuant8SymmPerChannelPerformancePowerUsage, defaultValue)
                });
 
-        update(&capabilities.operandPerformance, OperandType::TENSOR_INT32,
+        update(&capabilities.operandPerformance, V1_2::OperandType::TENSOR_INT32,
                 {
                     .execTime = ParseSystemProperty(g_OperandTypeTensorInt32PerformanceExecTime, defaultValue),
                     .powerUsage = ParseSystemProperty(g_OperandTypeTensorInt32PerformancePowerUsage, defaultValue)
                 });
 
-        update(&capabilities.operandPerformance, OperandType::INT32,
+        update(&capabilities.operandPerformance, V1_2::OperandType::INT32,
                 {
                     .execTime = ParseSystemProperty(g_OperandTypeInt32PerformanceExecTime, defaultValue),
                     .powerUsage = ParseSystemProperty(g_OperandTypeInt32PerformancePowerUsage, defaultValue)
                 });
 
-        cb(ErrorStatus::NONE, capabilities);
+        cb(V1_0::ErrorStatus::NONE, capabilities);
     }
     else
     {
@@ -313,9 +313,9 @@ Return<void> ArmnnDriverImpl::getCapabilities_1_2(const armnn::IRuntimePtr& runt
         capabilities.relaxedFloat32toFloat16PerformanceTensor.execTime = 0;
 
         // Set the base value for all operand types
-        capabilities.operandPerformance = nonExtensionOperandPerformance({0.f, 0.0f});
+        capabilities.operandPerformance = ::android::nn::nonExtensionOperandPerformance<android::nn::HalVersion::V1_2>(V1_0::PerformanceInfo{0.f, 0.0f});
 
-        cb(ErrorStatus::DEVICE_UNAVAILABLE, capabilities);
+        cb(V1_0::ErrorStatus::DEVICE_UNAVAILABLE, capabilities);
     }
 
     return Void();

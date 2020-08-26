@@ -38,7 +38,7 @@ public:
 
     virtual ~ArmnnPreparedModel();
 
-    virtual Return<ErrorStatus> execute(const Request& request,
+    virtual Return<V1_0::ErrorStatus> execute(const V1_0::Request& request,
                                         const ::android::sp<V1_0::IExecutionCallback>& callback) override;
 
     /// execute the graph prepared from the request

@@ -6,11 +6,10 @@
 #pragma once
 
 #include "DriverOptions.hpp"
+#include "NamespaceAdaptor.hpp"
 
 #include <HalInterfaces.h>
 
-namespace V1_0 = ::android::hardware::neuralnetworks::V1_0;
-namespace V1_1 = ::android::hardware::neuralnetworks::V1_1;
 
 #ifdef ARMNN_ANDROID_NN_V1_2 // Using ::android::hardware::neuralnetworks::V1_2
 namespace V1_2 = ::android::hardware::neuralnetworks::V1_2;
@@ -32,7 +31,7 @@ public:
             const HalModel& model,
             HalGetSupportedOperations_cb);
 
-    static Return<ErrorStatus> prepareModel(
+    static Return<V1_0::ErrorStatus> prepareModel(
             const armnn::IRuntimePtr& runtime,
             const armnn::IGpuAccTunedParametersPtr& clTunedParameters,
             const DriverOptions& options,
@@ -40,7 +39,7 @@ public:
             const android::sp<V1_0::IPreparedModelCallback>& cb,
             bool float32ToFloat16 = false);
 
-    static Return<DeviceStatus> getStatus();
+    static Return<V1_0::DeviceStatus> getStatus();
 
 };
 

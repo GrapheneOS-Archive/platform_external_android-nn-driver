@@ -6,6 +6,7 @@
 #pragma once
 
 #include "../ConversionUtils.hpp"
+#include "../NamespaceAdaptor.hpp"
 
 #include <HalInterfaces.h>
 

@@ -62,7 +62,7 @@ void SwizzleAndroidNn4dTensorToArmNn(const armnn::TensorInfo& tensor, const void
     }
 }
 
-void* GetMemoryFromPool(DataLocation location, const std::vector<android::nn::RunTimePoolInfo>& memPools)
+void* GetMemoryFromPool(V1_0::DataLocation location, const std::vector<android::nn::RunTimePoolInfo>& memPools)
 {
     // find the location within the pool
     assert(location.poolIndex < memPools.size());

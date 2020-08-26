@@ -25,7 +25,7 @@ using namespace android::hardware;
 
 namespace {
 
-static const Timing g_NoTiming = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
+static const V1_2::Timing g_NoTiming = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
 using namespace armnn_driver;
 using TimePoint = std::chrono::steady_clock::time_point;
 
@@ -41,9 +41,9 @@ unsigned long MicrosecondsDuration(TimePoint endPoint, TimePoint startPoint)
 }
 
 void NotifyCallbackAndCheck(const ::android::sp<V1_0::IExecutionCallback>& callback,
-                            ErrorStatus errorStatus,
-                            std::vector<OutputShape>,
-                            const Timing,
+                            V1_0::ErrorStatus errorStatus,
+                            std::vector<V1_2::OutputShape>,
+                            const V1_2::Timing,
                             std::string callingFunction)
 {
     Return<void> returned = callback->notify(errorStatus);
@@ -56,9 +56,9 @@ void NotifyCallbackAndCheck(const ::android::sp<V1_0::IExecutionCallback>& callb
 }
 
 void NotifyCallbackAndCheck(const ::android::sp<V1_2::IExecutionCallback>& callback,
-                            ErrorStatus errorStatus,
-                            std::vector<OutputShape> outputShapes,
-                            const Timing timing,
+                            V1_0::ErrorStatus errorStatus,
+                            std::vector<V1_2::OutputShape> outputShapes,
+                            const V1_2::Timing timing,
                             std::string callingFunction)
 {
     Return<void> returned = callback->notify_1_2(errorStatus, outputShapes, timing);
@@ -70,7 +70,7 @@ void NotifyCallbackAndCheck(const ::android::sp<V1_2::IExecutionCallback>& callb
     }
 }
 
-bool ValidateRequestArgument(const RequestArgument& requestArg, const armnn::TensorInfo& tensorInfo)
+bool ValidateRequestArgument(const V1_0::RequestArgument& requestArg, const armnn::TensorInfo& tensorInfo)
 {
     if (requestArg.dimensions.size() != 0)
     {
@@ -95,7 +95,7 @@ bool ValidateRequestArgument(const RequestArgument& requestArg, const armnn::Ten
     return true;
 }
 
-armnn::Tensor GetTensorForRequestArgument(const RequestArgument& requestArg,
+armnn::Tensor GetTensorForRequestArgument(const V1_0::RequestArgument& requestArg,
                                           const armnn::TensorInfo& tensorInfo,
                                           const std::vector<::android::nn::RunTimePoolInfo>& requestPools)
 {
@@ -172,40 +172,40 @@ ArmnnPreparedModel_1_2<HalVersion>::~ArmnnPreparedModel_1_2()
 }
 
 template<typename HalVersion>
-Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::execute(const Request& request,
+Return <V1_0::ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::execute(const V1_0::Request& request,
         const ::android::sp<V1_0::IExecutionCallback>& callback)
 {
     if (callback.get() == nullptr)
     {
         ALOGE("ArmnnPreparedModel_1_2::execute invalid callback passed");
-        return ErrorStatus::INVALID_ARGUMENT;
+        return V1_0::ErrorStatus::INVALID_ARGUMENT;
     }
 
-    auto cb = [callback](ErrorStatus errorStatus,
-                         std::vector<OutputShape> outputShapes,
-                         const Timing& timing,
+    auto cb = [callback](V1_0::ErrorStatus errorStatus,
+                         std::vector<V1_2::OutputShape> outputShapes,
+                         const V1_2::Timing& timing,
                          std::string callingFunction)
     {
         NotifyCallbackAndCheck(callback, errorStatus, outputShapes, timing, callingFunction);
     };
 
-    return Execute(request, MeasureTiming::NO, cb);
+    return Execute(request, V1_2::MeasureTiming::NO, cb);
 }
 
 template<typename HalVersion>
-Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::execute_1_2(const Request& request,
-                                                                     MeasureTiming measureTiming,
+Return <V1_0::ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::execute_1_2(const V1_0::Request& request,
+                                                                     V1_2::MeasureTiming measureTiming,
                                                                      const sp<V1_2::IExecutionCallback>& callback)
 {
     if (callback.get() == nullptr)
     {
         ALOGE("ArmnnPreparedModel_1_2::execute_1_2 invalid callback passed");
-        return ErrorStatus::INVALID_ARGUMENT;
+        return V1_0::ErrorStatus::INVALID_ARGUMENT;
     }
 
-    auto cb = [callback](ErrorStatus errorStatus,
-                         std::vector<OutputShape> outputShapes,
-                         const Timing& timing,
+    auto cb = [callback](V1_0::ErrorStatus errorStatus,
+                         std::vector<V1_2::OutputShape> outputShapes,
+                         const V1_2::Timing& timing,
                          std::string callingFunction)
     {
         NotifyCallbackAndCheck(callback, errorStatus, outputShapes, timing, callingFunction);
@@ -215,8 +215,8 @@ Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::execute_1_2(const Reque
 }
 
 template<typename HalVersion>
-Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Request& request,
-                                                                      MeasureTiming measureTiming,
+Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const V1_0::Request& request,
+                                                                      V1_2::MeasureTiming measureTiming,
                                                                       executeSynchronously_cb cb)
 {
     ALOGV("ArmnnPreparedModel_1_2::executeSynchronously(): %s", GetModelSummary(m_Model).c_str());
@@ -230,7 +230,7 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
 
     TimePoint driverStart, driverEnd, deviceStart, deviceEnd;
 
-    if (measureTiming == MeasureTiming::YES)
+    if (measureTiming == V1_2::MeasureTiming::YES)
     {
         driverStart = Now();
     }
@@ -238,7 +238,7 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
     if (!android::nn::validateRequest(request, m_Model))
     {
         ALOGE("ArmnnPreparedModel_1_2::executeSynchronously invalid request model");
-        cb(ErrorStatus::INVALID_ARGUMENT, {}, g_NoTiming);
+        cb(V1_0::ErrorStatus::INVALID_ARGUMENT, {}, g_NoTiming);
         return Void();
     }
 
@@ -252,10 +252,10 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
 
     if (!setRunTimePoolInfosFromHidlMemories(pMemPools.get(), request.pools))
     {
-        cb(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
+        cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
         return Void();
     }
-    std::vector<OutputShape> outputShapes(request.outputs.size());
+    std::vector<V1_2::OutputShape> outputShapes(request.outputs.size());
 
     try
     {
@@ -270,7 +270,7 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
             if (inputTensor.GetMemoryArea() == nullptr)
             {
                 ALOGE("Cannot execute request. Error converting request input %u to tensor", i);
-                cb(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
+                cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
                 return Void();
             }
 
@@ -288,7 +288,7 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
             if (outputTensor.GetMemoryArea() == nullptr)
             {
                 ALOGE("Cannot execute request. Error converting request output %u to tensor", i);
-                cb(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
+                cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
                 return Void();
             }
             const size_t outputSize = outputTensorInfo.GetNumBytes();
@@ -310,7 +310,7 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
             if (bufferSize < outputSize)
             {
                 ALOGW("ArmnnPreparedModel_1_2::Execute failed");
-                cb(ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, outputShapes, g_NoTiming);
+                cb(V1_0::ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, outputShapes, g_NoTiming);
                 return Void();
             }
 
@@ -320,13 +320,13 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
     catch (armnn::Exception& e)
     {
         ALOGW("armnn::Exception caught while preparing for EnqueueWorkload: %s", e.what());
-        cb(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
+        cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
         return Void();
     }
     catch (std::exception& e)
     {
         ALOGE("std::exception caught while preparing for EnqueueWorkload: %s", e.what());
-        cb(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
+        cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
         return Void();
     }
 
@@ -336,14 +336,14 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
     // run it
     try
     {
-        if (measureTiming == MeasureTiming::YES)
+        if (measureTiming == V1_2::MeasureTiming::YES)
         {
             deviceStart = Now();
         }
 
         armnn::Status status = m_Runtime->EnqueueWorkload(m_NetworkId, *pInputTensors, *pOutputTensors);
 
-        if (measureTiming == MeasureTiming::YES)
+        if (measureTiming == V1_2::MeasureTiming::YES)
         {
             deviceEnd = Now();
         }
@@ -351,20 +351,20 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
         if (status != armnn::Status::Success)
         {
             ALOGW("EnqueueWorkload failed");
-            cb(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
+            cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
             return Void();
         }
     }
     catch (armnn::Exception& e)
     {
         ALOGW("armnn::Exception caught from EnqueueWorkload: %s", e.what());
-        cb(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
+        cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
         return Void();
     }
     catch (std::exception& e)
     {
         ALOGE("std::exception caught from EnqueueWorkload: %s", e.what());
-        cb(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
+        cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming);
         return Void();
     }
 
@@ -379,19 +379,19 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
     }
     ALOGV("ArmnnPreparedModel_1_2::executeSynchronously() after Execution");
 
-    if (measureTiming == MeasureTiming::YES)
+    if (measureTiming == V1_2::MeasureTiming::YES)
     {
         driverEnd = Now();
-        Timing timing;
+        V1_2::Timing timing;
         timing.timeOnDevice = MicrosecondsDuration(deviceEnd, deviceStart);
         timing.timeInDriver = MicrosecondsDuration(driverEnd, driverStart);
         ALOGV("ArmnnPreparedModel_1_2::executeSynchronously timing Device = %" PRIu64 " Driver = %" PRIu64,
                 timing.timeOnDevice, timing.timeInDriver);
-        cb(ErrorStatus::NONE, outputShapes, timing);
+        cb(V1_0::ErrorStatus::NONE, outputShapes, timing);
     }
     else
     {
-        cb(ErrorStatus::NONE, outputShapes, g_NoTiming);
+        cb(V1_0::ErrorStatus::NONE, outputShapes, g_NoTiming);
     }
     return Void();
 }
@@ -402,7 +402,7 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
 ///         ml/+/refs/tags/android-10.0.0_r20/nn/common/ExecutionBurstServer.cpp
 class ArmnnBurstExecutorWithCache : public ExecutionBurstServer::IBurstExecutorWithCache {
 public:
-    ArmnnBurstExecutorWithCache(IPreparedModel* preparedModel)
+    ArmnnBurstExecutorWithCache(V1_2::IPreparedModel* preparedModel)
         : m_PreparedModel(preparedModel)
     {}
 
@@ -422,9 +422,9 @@ public:
         m_MemoryCache.erase(slot);
     }
 
-    std::tuple<ErrorStatus, hidl_vec<OutputShape>, Timing> execute(
-            const Request& request, const std::vector<int32_t>& slots,
-            MeasureTiming measure) override
+    std::tuple<V1_0::ErrorStatus, hidl_vec<V1_2::OutputShape>, V1_2::Timing> execute(
+            const V1_0::Request& request, const std::vector<int32_t>& slots,
+            V1_2::MeasureTiming measure) override
     {
         ALOGV("ArmnnPreparedModel_1_2::BurstExecutorWithCache::execute");
         hidl_vec<hidl_memory> pools(slots.size());
@@ -434,16 +434,16 @@ public:
             return m_MemoryCache[slot];
         });
 
-        Request fullRequest = request;
+        V1_0::Request fullRequest = request;
         fullRequest.pools = std::move(pools);
 
         // Setup Callback
-        ErrorStatus returnedStatus = ErrorStatus::GENERAL_FAILURE;
-        hidl_vec<OutputShape> returnedOutputShapes;
-        Timing returnedTiming;
-        auto cb = [&returnedStatus, &returnedOutputShapes, &returnedTiming](ErrorStatus status,
-                                                                            const hidl_vec<OutputShape>& outputShapes,
-                                                                            const Timing& timing)
+        V1_0::ErrorStatus returnedStatus = V1_0::ErrorStatus::GENERAL_FAILURE;
+        hidl_vec<V1_2::OutputShape> returnedOutputShapes;
+        V1_2::Timing returnedTiming;
+        auto cb = [&returnedStatus, &returnedOutputShapes, &returnedTiming](V1_0::ErrorStatus status,
+                                                                            const hidl_vec<V1_2::OutputShape>& outputShapes,
+                                                                            const V1_2::Timing& timing)
         {
             returnedStatus = status;
             returnedOutputShapes = outputShapes;
@@ -454,7 +454,7 @@ public:
         ALOGV("ArmnnPreparedModel_1_2::BurstExecutorWithCache executing");
         const Return<void> ret = m_PreparedModel->executeSynchronously(fullRequest, measure, cb);
 
-        if (!ret.isOk() || returnedStatus != ErrorStatus::NONE)
+        if (!ret.isOk() || returnedStatus != V1_0::ErrorStatus::NONE)
         {
             ALOGE("ArmnnPreparedModel_1_2::BurstExecutorWithCache::error executing");
         }
@@ -462,7 +462,7 @@ public:
     }
 
 private:
-    IPreparedModel* const m_PreparedModel;
+    V1_2::IPreparedModel* const m_PreparedModel;
     std::map<int, hidl_memory> m_MemoryCache;
 };
 
@@ -484,11 +484,11 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::configureExecutionBurst(
 
     if (burst == nullptr)
     {
-        cb(ErrorStatus::GENERAL_FAILURE, {});
+        cb(V1_0::ErrorStatus::GENERAL_FAILURE, {});
     }
     else
     {
-        cb(ErrorStatus::NONE, burst);
+        cb(V1_0::ErrorStatus::NONE, burst);
     }
     return Void();
 }
@@ -507,7 +507,7 @@ void ArmnnPreparedModel_1_2<HalVersion>::ExecuteGraph(
     DumpTensorsIfRequired("Input", *pInputTensors);
 
     std::vector<std::pair<int, armnn::Tensor> > outputTensors = *pOutputTensors.get();
-    std::vector<OutputShape> outputShapes(outputTensors.size());
+    std::vector<V1_2::OutputShape> outputShapes(outputTensors.size());
 
     for (unsigned int i = 0; i < outputTensors.size(); i++)
     {
@@ -532,21 +532,21 @@ void ArmnnPreparedModel_1_2<HalVersion>::ExecuteGraph(
     // run it
     try
     {
-        if (cb.measureTiming == MeasureTiming::YES)
+        if (cb.measureTiming == V1_2::MeasureTiming::YES)
         {
             deviceStart = Now();
         }
 
         armnn::Status status = m_Runtime->EnqueueWorkload(m_NetworkId, *pInputTensors, *pOutputTensors);
 
-        if (cb.measureTiming == MeasureTiming::YES)
+        if (cb.measureTiming == V1_2::MeasureTiming::YES)
         {
             deviceEnd = Now();
         }
         if (status != armnn::Status::Success)
         {
             ALOGW("EnqueueWorkload failed");
-            cb.callback(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming,
+            cb.callback(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming,
                     "ArmnnPreparedModel_1_2::ExecuteGraph");
             return;
         }
@@ -554,13 +554,13 @@ void ArmnnPreparedModel_1_2<HalVersion>::ExecuteGraph(
     catch (armnn::Exception& e)
     {
         ALOGW("armnn:Exception caught from EnqueueWorkload: %s", e.what());
-        cb.callback(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::ExecuteGraph");
+        cb.callback(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::ExecuteGraph");
         return;
     }
     catch (std::exception& e)
     {
         ALOGE("std::exception caught from EnqueueWorkload: %s", e.what());
-        cb.callback(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::ExecuteGraph");
+        cb.callback(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::ExecuteGraph");
         return;
     }
 
@@ -574,15 +574,15 @@ void ArmnnPreparedModel_1_2<HalVersion>::ExecuteGraph(
         pool.flush();
     }
 
-    if (cb.measureTiming == MeasureTiming::YES)
+    if (cb.measureTiming == V1_2::MeasureTiming::YES)
     {
         driverEnd = Now();
-        Timing timing;
+        V1_2::Timing timing;
         timing.timeOnDevice = MicrosecondsDuration(deviceEnd, deviceStart);
         timing.timeInDriver = MicrosecondsDuration(driverEnd, cb.driverStart);
-        cb.callback(ErrorStatus::NONE, outputShapes, timing, "ExecuteGraph");
+        cb.callback(V1_0::ErrorStatus::NONE, outputShapes, timing, "ExecuteGraph");
     } else {
-        cb.callback(ErrorStatus::NONE, outputShapes, g_NoTiming, "ExecuteGraph");
+        cb.callback(V1_0::ErrorStatus::NONE, outputShapes, g_NoTiming, "ExecuteGraph");
     }
 }
 
@@ -633,13 +633,13 @@ bool ArmnnPreparedModel_1_2<HalVersion>::ExecuteWithDummyInputs()
 }
 
 template<typename HalVersion>
-Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::Execute(const Request& request,
-                                                                 MeasureTiming measureTiming,
+Return <V1_0::ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::Execute(const V1_0::Request& request,
+                                                                 V1_2::MeasureTiming measureTiming,
                                                                  armnnExecuteCallback_1_2 callback)
 {
     TimePoint driverStart;
 
-    if (measureTiming == MeasureTiming::YES)
+    if (measureTiming == V1_2::MeasureTiming::YES)
     {
         driverStart = Now();
     }
@@ -649,8 +649,8 @@ Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::Execute(const Request& 
 
     if (!android::nn::validateRequest(request, m_Model))
     {
-        callback(ErrorStatus::INVALID_ARGUMENT, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
-        return ErrorStatus::INVALID_ARGUMENT;
+        callback(V1_0::ErrorStatus::INVALID_ARGUMENT, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
+        return V1_0::ErrorStatus::INVALID_ARGUMENT;
     }
 
     if (!m_RequestInputsAndOutputsDumpDir.empty())
@@ -668,8 +668,8 @@ Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::Execute(const Request& 
 
     if (!setRunTimePoolInfosFromHidlMemories(pMemPools.get(), request.pools))
     {
-        callback(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
-        return ErrorStatus::GENERAL_FAILURE;
+        callback(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
+        return V1_0::ErrorStatus::GENERAL_FAILURE;
     }
 
     // add the inputs and outputs with their data
@@ -686,15 +686,15 @@ Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::Execute(const Request& 
             if (inputTensor.GetMemoryArea() == nullptr)
             {
                 ALOGE("Cannot execute request. Error converting request input %u to tensor", i);
-                callback(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
-                return ErrorStatus::GENERAL_FAILURE;
+                callback(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
+                return V1_0::ErrorStatus::GENERAL_FAILURE;
             }
 
             pInputTensors->emplace_back(i, inputTensor);
         }
 
         pOutputTensors->reserve(request.outputs.size());
-        std::vector<OutputShape> outputShapes(request.outputs.size());
+        std::vector<V1_2::OutputShape> outputShapes(request.outputs.size());
 
         for (unsigned int i = 0; i < request.outputs.size(); i++)
         {
@@ -705,8 +705,8 @@ Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::Execute(const Request& 
             if (outputTensor.GetMemoryArea() == nullptr)
             {
                 ALOGE("Cannot execute request. Error converting request output %u to tensor", i);
-                callback(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
-                return ErrorStatus::GENERAL_FAILURE;
+                callback(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
+                return V1_0::ErrorStatus::GENERAL_FAILURE;
             }
 
             const size_t outputSize = outputTensorInfo.GetNumBytes();
@@ -729,25 +729,25 @@ Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::Execute(const Request& 
             if (bufferSize < outputSize)
             {
                 ALOGW("ArmnnPreparedModel_1_2::Execute failed");
-                callback(ErrorStatus::OUTPUT_INSUFFICIENT_SIZE,
+                callback(V1_0::ErrorStatus::OUTPUT_INSUFFICIENT_SIZE,
                          outputShapes,
                          g_NoTiming,
                          "ArmnnPreparedModel_1_2::Execute");
-                return ErrorStatus::NONE;
+                return V1_0::ErrorStatus::NONE;
             }
         }
     }
     catch (armnn::Exception& e)
     {
         ALOGW("armnn::Exception caught while preparing for EnqueueWorkload: %s", e.what());
-        callback(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
-        return ErrorStatus::GENERAL_FAILURE;
+        callback(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
+        return V1_0::ErrorStatus::GENERAL_FAILURE;
     }
     catch (std::exception& e)
     {
         ALOGE("std::exception caught while preparing for EnqueueWorkload: %s", e.what());
-        callback(ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
-        return ErrorStatus::GENERAL_FAILURE;
+        callback(V1_0::ErrorStatus::GENERAL_FAILURE, {}, g_NoTiming, "ArmnnPreparedModel_1_2::execute");
+        return V1_0::ErrorStatus::GENERAL_FAILURE;
     }
 
     ALOGV("ArmnnPreparedModel_1_2::execute(...) before PostMsg");
@@ -758,7 +758,7 @@ Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::Execute(const Request& 
     armnnCb.driverStart = driverStart;
     m_RequestThread.PostMsg(this, pMemPools, pInputTensors, pOutputTensors, armnnCb);
     ALOGV("ArmnnPreparedModel_1_2::execute(...) after PostMsg");
-    return ErrorStatus::NONE;
+    return V1_0::ErrorStatus::NONE;
 }
 
 #ifdef ARMNN_ANDROID_NN_V1_2

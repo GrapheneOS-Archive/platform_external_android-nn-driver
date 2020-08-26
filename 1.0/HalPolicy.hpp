@@ -6,10 +6,9 @@
 #pragma once
 
 #include "../ConversionUtils.hpp"
+#include "NamespaceAdaptor.hpp"
 
 #include <HalInterfaces.h>
-
-namespace V1_0 = ::android::hardware::neuralnetworks::V1_0;
 
 namespace armnn_driver
 {

@@ -8,6 +8,7 @@
 #include <HalInterfaces.h>
 
 #include "../DriverOptions.hpp"
+#include "NamespaceAdaptor.hpp"
 
 #include <armnn/ArmNN.hpp>
 
@@ -19,7 +20,7 @@ namespace hal_1_2
 class ArmnnDriverImpl
 {
 public:
-    static Return<ErrorStatus> prepareArmnnModel_1_2(const armnn::IRuntimePtr& runtime,
+    static Return<V1_0::ErrorStatus> prepareArmnnModel_1_2(const armnn::IRuntimePtr& runtime,
                                                      const armnn::IGpuAccTunedParametersPtr& clTunedParameters,
                                                      const DriverOptions& options,
                                                      const V1_2::Model& model,

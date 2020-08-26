@@ -10,6 +10,7 @@
 #include "../ArmnnDevice.hpp"
 #include "ArmnnDriverImpl.hpp"
 #include "HalPolicy.hpp"
+#include "NamespaceAdaptor.hpp"
 
 #include "../ArmnnDriverImpl.hpp"
 
@@ -46,7 +47,7 @@ public:
         return armnn_driver::ArmnnDriverImpl<HalPolicy>::getSupportedOperations(m_Runtime, m_Options, model, cb);
     }
 
-    Return<ErrorStatus> prepareModel(const V1_0::Model& model,
+    Return<V1_0::ErrorStatus> prepareModel(const V1_0::Model& model,
                                      const android::sp<V1_0::IPreparedModelCallback>& cb) override
     {
         ALOGV("hal_1_0::ArmnnDriver::prepareModel()");
@@ -58,7 +59,7 @@ public:
                                                                       cb);
     }
 
-    Return<DeviceStatus> getStatus() override
+    Return<V1_0::DeviceStatus> getStatus() override
     {
         ALOGV("hal_1_0::ArmnnDriver::getStatus()");
 

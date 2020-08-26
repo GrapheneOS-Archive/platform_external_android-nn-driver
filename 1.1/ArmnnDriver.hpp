@@ -14,6 +14,7 @@
 #include "../ArmnnDriverImpl.hpp"
 #include "../1.0/ArmnnDriverImpl.hpp"
 #include "../1.0/HalPolicy.hpp"
+#include "../NamespaceAdaptor.hpp"
 
 #include <log/log.h>
 
@@ -51,7 +52,7 @@ public:
                                                                                          cb);
     }
 
-    Return<ErrorStatus> prepareModel(const V1_0::Model& model,
+    Return<V1_0::ErrorStatus> prepareModel(const V1_0::Model& model,
                                      const android::sp<V1_0::IPreparedModelCallback>& cb) override
     {
         ALOGV("hal_1_1::ArmnnDriver::prepareModel()");
@@ -81,19 +82,19 @@ public:
                                                                                          cb);
     }
 
-    Return<ErrorStatus> prepareModel_1_1(const V1_1::Model& model,
+    Return<V1_0::ErrorStatus> prepareModel_1_1(const V1_1::Model& model,
                                          V1_1::ExecutionPreference preference,
                                          const android::sp<V1_0::IPreparedModelCallback>& cb) override
     {
         ALOGV("hal_1_1::ArmnnDriver::prepareModel_1_1()");
 
-        if (!(preference == ExecutionPreference::LOW_POWER ||
-              preference == ExecutionPreference::FAST_SINGLE_ANSWER ||
-              preference == ExecutionPreference::SUSTAINED_SPEED))
+        if (!(preference == V1_1::ExecutionPreference::LOW_POWER ||
+              preference == V1_1::ExecutionPreference::FAST_SINGLE_ANSWER ||
+              preference == V1_1::ExecutionPreference::SUSTAINED_SPEED))
         {
             ALOGV("hal_1_1::ArmnnDriver::prepareModel_1_1: Invalid execution preference");
-            cb->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
-            return ErrorStatus::INVALID_ARGUMENT;
+            cb->notify(V1_0::ErrorStatus::INVALID_ARGUMENT, nullptr);
+            return V1_0::ErrorStatus::INVALID_ARGUMENT;
         }
 
         return armnn_driver::ArmnnDriverImpl<hal_1_1::HalPolicy>::prepareModel(m_Runtime,
@@ -105,7 +106,7 @@ public:
                                                                                && m_Options.GetFp16Enabled());
     }
 
-    Return<DeviceStatus> getStatus() override
+    Return<V1_0::DeviceStatus> getStatus() override
     {
         ALOGV("hal_1_1::ArmnnDriver::getStatus()");
 
