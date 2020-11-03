@@ -292,7 +292,7 @@ Return<void> ArmnnPreparedModel_1_2<HalVersion>::executeSynchronously(const Requ
                 return Void();
             }
             const size_t outputSize = outputTensorInfo.GetNumBytes();
-            const size_t bufferSize = pMemPools->at(outputArg.location.poolIndex).getHidlMemory().size();
+            const size_t bufferSize = pMemPools->at(outputArg.location.poolIndex).getSize();
 
             hidl_vec<uint32_t> dimensions;
 
@@ -710,7 +710,7 @@ Return <ErrorStatus> ArmnnPreparedModel_1_2<HalVersion>::Execute(const Request& 
             }
 
             const size_t outputSize = outputTensorInfo.GetNumBytes();
-            const size_t bufferSize = pMemPools->at(outputArg.location.poolIndex).getHidlMemory().size();
+            const size_t bufferSize = pMemPools->at(outputArg.location.poolIndex).getSize();
             pOutputTensors->emplace_back(i, outputTensor);
 
             hidl_vec<uint32_t> dimensions;
