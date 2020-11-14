@@ -1,0 +1,25 @@
+//
+// Copyright © 2017 ARM Ltd. All rights reserved.
+// SPDX-License-Identifier: MIT
+//
+
+bootstrap_go_package {
+    name: "armnn_nn_driver",
+    pkgPath: "android-nn-driver",
+    deps: [
+        "blueprint",
+        "blueprint-pathtools",
+        "blueprint-proptools",
+        "soong",
+        "soong-android",
+        "soong-cc",
+    ],
+    srcs: [
+        "androidnn.go",
+    ],
+    pluginFor: [ "soong_build" ],
+}
+
+subdirs = [
+    "armnn",
+]
