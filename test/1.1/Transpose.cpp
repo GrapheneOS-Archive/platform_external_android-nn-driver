@@ -9,12 +9,12 @@
 
 #include "../1.1/HalPolicy.hpp"
 
-#include <boost/array.hpp>
 #include <boost/test/unit_test.hpp>
 #include <boost/test/data/test_case.hpp>
 
 #include <log/log.h>
 
+#include <array>
 #include <cmath>
 
 BOOST_AUTO_TEST_SUITE(TransposeTests)
@@ -29,9 +29,9 @@ namespace
 {
 
 #ifndef ARMCOMPUTECL_ENABLED
-    static const boost::array<armnn::Compute, 1> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef }};
+    static const std::array<armnn::Compute, 1> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef }};
 #else
-    static const boost::array<armnn::Compute, 2> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef, armnn::Compute::GpuAcc }};
+    static const std::array<armnn::Compute, 2> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef, armnn::Compute::GpuAcc }};
 #endif
 
 void TransposeTestImpl(const TestTensor & inputs, int32_t perm[],
@@ -76,7 +76,7 @@ void TransposeTestImpl(const TestTensor & inputs, int32_t perm[],
     output.dimensions = expectedOutputTensor.GetDimensions();
 
     // make the request based on the arguments
-    Request request = {};
+    V1_0::Request request = {};
     request.inputs  = hidl_vec<RequestArgument>{input};
     request.outputs = hidl_vec<RequestArgument>{output};
 
@@ -89,7 +89,10 @@ void TransposeTestImpl(const TestTensor & inputs, int32_t perm[],
     android::sp<IMemory> outMemory = AddPoolAndGetData<float>(expectedOutputTensor.GetNumElements(), request);
     float* outdata = static_cast<float*>(static_cast<void*>(outMemory->getPointer()));
 
-    auto execStatus = Execute(preparedModel, request);
+    if (preparedModel.get() != nullptr)
+    {
+        auto execStatus = Execute(preparedModel, request);
+    }
 
     const float * expectedOutput = expectedOutputTensor.GetData();
     for (unsigned int i = 0; i < expectedOutputTensor.GetNumElements(); ++i)

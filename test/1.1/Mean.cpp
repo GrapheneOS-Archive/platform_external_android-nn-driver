@@ -8,8 +8,9 @@
 
 #include "../1.1/HalPolicy.hpp"
 
-#include <boost/array.hpp>
 #include <boost/test/data/test_case.hpp>
+
+#include <array>
 
 BOOST_AUTO_TEST_SUITE(MeanTests)
 
@@ -23,9 +24,9 @@ namespace
 {
 
 #ifndef ARMCOMPUTECL_ENABLED
-    static const boost::array<armnn::Compute, 1> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef }};
+    static const std::array<armnn::Compute, 1> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef }};
 #else
-    static const boost::array<armnn::Compute, 2> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef, armnn::Compute::GpuAcc }};
+    static const std::array<armnn::Compute, 2> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef, armnn::Compute::GpuAcc }};
 #endif
 
 void MeanTestImpl(const TestTensor& input,
@@ -78,7 +79,7 @@ void MeanTestImpl(const TestTensor& input,
     outArg.dimensions      = expectedOutput.GetDimensions();
 
     // Make the request based on the arguments
-    Request request = {};
+    V1_0::Request request = {};
     request.inputs  = hidl_vec<RequestArgument>{ inArg };
     request.outputs = hidl_vec<RequestArgument>{ outArg };
 
@@ -89,8 +90,11 @@ void MeanTestImpl(const TestTensor& input,
     android::sp<IMemory> outMemory = AddPoolAndGetData<float>(expectedOutput.GetNumElements(), request);
     const float* outputData = static_cast<const float*>(static_cast<void*>(outMemory->getPointer()));
 
-    ErrorStatus execStatus = Execute(preparedModel, request);
-    BOOST_TEST(execStatus == ErrorStatus::NONE);
+    if (preparedModel.get() != nullptr)
+    {
+        V1_0::ErrorStatus execStatus = Execute(preparedModel, request);
+        BOOST_TEST(execStatus == V1_0::ErrorStatus::NONE);
+    }
 
     const float* expectedOutputData = expectedOutput.GetData();
     for (unsigned int i = 0; i < expectedOutput.GetNumElements(); i++)

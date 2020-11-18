@@ -8,13 +8,13 @@
 #include "DriverOptions.hpp"
 #include "Utils.hpp"
 
+#include <armnn/Version.hpp>
 #include <log/log.h>
 #include "SystemPropertiesUtils.hpp"
 
 #include <OperationsUtils.h>
 
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/program_options.hpp>
+#include <cxxopts/cxxopts.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -35,6 +35,7 @@ DriverOptions::DriverOptions(armnn::Compute computeDevice, bool fp16Enabled)
     , m_ClTuningLevel(armnn::IGpuAccTunedParameters::TuningLevel::Rapid)
     , m_EnableGpuProfiling(false)
     , m_fp16Enabled(fp16Enabled)
+    , m_FastMathEnabled(false)
 {
 }
 
@@ -45,6 +46,7 @@ DriverOptions::DriverOptions(const std::vector<armnn::BackendId>& backends, bool
     , m_ClTuningLevel(armnn::IGpuAccTunedParameters::TuningLevel::Rapid)
     , m_EnableGpuProfiling(false)
     , m_fp16Enabled(fp16Enabled)
+    , m_FastMathEnabled(false)
 {
 }
 
@@ -54,76 +56,135 @@ DriverOptions::DriverOptions(int argc, char** argv)
     , m_ClTuningLevel(armnn::IGpuAccTunedParameters::TuningLevel::Rapid)
     , m_EnableGpuProfiling(false)
     , m_fp16Enabled(false)
+    , m_FastMathEnabled(false)
+    , m_ShouldExit(false)
 {
-    namespace po = boost::program_options;
-
     std::string unsupportedOperationsAsString;
     std::string clTunedParametersModeAsString;
     std::string clTuningLevelAsString;
+    std::vector<std::string> backends;
+    bool showHelp;
+    bool showVersion;
 
-    po::options_description optionsDesc("Options");
-    optionsDesc.add_options()
-        ("compute,c",
-         po::value<std::vector<std::string>>()->
-            multitoken()->default_value(std::vector<std::string>{"GpuAcc"}, "{GpuAcc}"),
-         "Which backend to run layers on. Examples of possible values are: CpuRef, CpuAcc, GpuAcc")
+    cxxopts::Options optionsDesc(argv[0], "ArmNN Android NN driver for the Android Neural Networks API. The Android NN "
+                                          "driver will convert Android NNAPI requests and delegate them to available "
+                                          "ArmNN backends.");
+    try
+    {
+        optionsDesc.add_options()
 
-        ("verbose-logging,v",
-         po::bool_switch(&m_VerboseLogging),
-         "Turns verbose logging on")
+        ("a,enable-fast-math", "Enables fast_math options in backends that support it. Using the fast_math flag can "
+                               "lead to performance improvements but may result in reduced or different precision.",
+         cxxopts::value<bool>(m_FastMathEnabled)->default_value("false"))
 
-        ("request-inputs-and-outputs-dump-dir,d",
-         po::value<std::string>(&m_RequestInputsAndOutputsDumpDir)->default_value(""),
-         "If non-empty, the directory where request inputs and outputs should be dumped")
+        ("c,compute",
+         "Comma separated list of backends to run layers on. Examples of possible values are: CpuRef, CpuAcc, GpuAcc",
+         cxxopts::value<std::vector<std::string>>(backends))
 
-        ("unsupported-operations,u",
-         po::value<std::string>(&unsupportedOperationsAsString)->default_value(""),
-         "If non-empty, a comma-separated list of operation indices which the driver will forcibly "
-         "consider unsupported")
+        ("d,request-inputs-and-outputs-dump-dir",
+         "If non-empty, the directory where request inputs and outputs should be dumped",
+         cxxopts::value<std::string>(m_RequestInputsAndOutputsDumpDir)->default_value(""))
 
-        ("cl-tuned-parameters-file,t",
-         po::value<std::string>(&m_ClTunedParametersFile)->default_value(""),
-         "If non-empty, the given file will be used to load/save CL tuned parameters. "
-         "See also --cl-tuned-parameters-mode")
+        ("f,fp16-enabled", "Enables support for relaxed computation from Float32 to Float16",
+         cxxopts::value<bool>(m_fp16Enabled)->default_value("false"))
 
-        ("cl-tuned-parameters-mode,m",
-         po::value<std::string>(&clTunedParametersModeAsString)->default_value("UseTunedParameters"),
+        ("h,help", "Show this help",
+         cxxopts::value<bool>(showHelp)->default_value("false"))
+
+        ("m,cl-tuned-parameters-mode",
          "If 'UseTunedParameters' (the default), will read CL tuned parameters from the file specified by "
          "--cl-tuned-parameters-file. "
          "If 'UpdateTunedParameters', will also find the optimum parameters when preparing new networks and update "
-         "the file accordingly.")
+         "the file accordingly.",
+         cxxopts::value<std::string>(clTunedParametersModeAsString)->default_value("UseTunedParameters"))
 
-        ("cl-tuning-level,o",
-         po::value<std::string>(&clTuningLevelAsString)->default_value("rapid"),
+        ("n,service-name",
+         "If non-empty, the driver service name to be registered",
+         cxxopts::value<std::string>(m_ServiceName)->default_value("armnn"))
+
+        ("o,cl-tuning-level",
          "exhaustive: all lws values are tested "
          "normal: reduced number of lws values but enough to still have the performance really close to the "
          "exhaustive approach "
-         "rapid: only 3 lws values should be tested for each kernel ")
+         "rapid: only 3 lws values should be tested for each kernel ",
+         cxxopts::value<std::string>(clTuningLevelAsString)->default_value("rapid"))
 
-        ("gpu-profiling,p",
-         po::bool_switch(&m_EnableGpuProfiling),
-         "Turns GPU profiling on")
+        ("p,gpu-profiling", "Turns GPU profiling on",
+         cxxopts::value<bool>(m_EnableGpuProfiling)->default_value("false"))
 
-        ("fp16-enabled,f",
-         po::bool_switch(&m_fp16Enabled),
-         "Enables support for relaxed computation from Float32 to Float16");
+        ("t,cl-tuned-parameters-file",
+         "If non-empty, the given file will be used to load/save CL tuned parameters. "
+         "See also --cl-tuned-parameters-mode",
+         cxxopts::value<std::string>(m_ClTunedParametersFile)->default_value(""))
 
-    po::variables_map variablesMap;
+        ("u,unsupported-operations",
+         "If non-empty, a comma-separated list of operation indices which the driver will forcibly "
+         "consider unsupported",
+         cxxopts::value<std::string>(unsupportedOperationsAsString)->default_value(""))
+
+        ("v,verbose-logging", "Turns verbose logging on",
+         cxxopts::value<bool>(m_VerboseLogging)->default_value("false"))
+
+        ("V,version", "Show version information",
+         cxxopts::value<bool>(showVersion)->default_value("false"));
+    }
+    catch (const std::exception& e)
+    {
+        ALOGE("An error occurred attempting to construct options: %s", e.what());
+        std::cout << "An error occurred attempting to construct options: %s" << std::endl;
+        m_ExitCode = EXIT_FAILURE;
+        return;
+    }
+
     try
     {
-        po::store(po::parse_command_line(argc, argv, optionsDesc), variablesMap);
-        po::notify(variablesMap);
+        cxxopts::ParseResult result = optionsDesc.parse(argc, argv);
     }
-    catch (const po::error& e)
+    catch (const cxxopts::OptionException& e)
     {
-        ALOGW("An error occurred attempting to parse program options: %s", e.what());
+        ALOGW("An exception occurred attempting to parse program options: %s", e.what());
+        std::cout << optionsDesc.help() << std::endl
+                  << "An exception occurred while parsing program options: " << std::endl
+                  << e.what() << std::endl;
+        m_ShouldExit = true;
+        m_ExitCode = EXIT_FAILURE;
+        return;
+    }
+    if (showHelp)
+    {
+        ALOGW("Showing help and exiting");
+        std::cout << optionsDesc.help() << std::endl;
+        m_ShouldExit = true;
+        m_ExitCode = EXIT_SUCCESS;
+        return;
+    }
+    if (showVersion)
+    {
+        ALOGW("Showing version and exiting");
+        std::cout << "ArmNN Android NN driver for the Android Neural Networks API.\n"
+                     "ArmNN v" << ARMNN_VERSION << std::endl;
+        m_ShouldExit = true;
+        m_ExitCode = EXIT_SUCCESS;
+        return;
     }
 
-    const std::vector<std::string> backends = variablesMap["compute"].as<std::vector<std::string>>();
+    // Convert the string backend names into backendId's.
     m_Backends.reserve(backends.size());
     for (auto&& backend : backends)
     {
-            m_Backends.emplace_back(backend);
+        m_Backends.emplace_back(backend);
+    }
+
+    // If no backends have been specified then the default value is GpuAcc.
+    if (backends.empty())
+    {
+        ALOGE("No backends have been specified:");
+        std::cout << optionsDesc.help() << std::endl
+                  << "Unable to start:" << std::endl
+                  << "No backends have been specified" << std::endl;
+        m_ShouldExit = true;
+        m_ExitCode = EXIT_FAILURE;
+        return;
     }
 
     if (!unsupportedOperationsAsString.empty())

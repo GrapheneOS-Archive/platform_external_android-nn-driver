@@ -8,15 +8,9 @@
 #include "ArmnnPreparedModel.hpp"
 #include "Utils.hpp"
 
-#include <boost/format.hpp>
 #include <log/log.h>
 #include <OperationsUtils.h>
-
-#if defined(ARMNN_ANDROID_P) || defined(ARMNN_ANDROID_Q)
-// The headers of the ML framework have changed between Android O and Android P.
-// The validation functions have been moved into their own header, ValidateHal.h.
 #include <ValidateHal.h>
-#endif
 
 #include <cassert>
 #include <cinttypes>
@@ -52,7 +46,7 @@ bool ValidateRequestArgument(const V1_0::RequestArgument& requestArg, const armn
 
         for (unsigned int d = 0; d < tensorInfo.GetNumDimensions(); ++d)
         {
-            if (requestArg.dimensions[d] != tensorInfo.GetShape()[d])
+            if (requestArg.dimensions[d] != 0 && requestArg.dimensions[d] != tensorInfo.GetShape()[d])
             {
                 ALOGE("Mismatched size for dimension %d (request argument: %u, expected %u)",
                     d, requestArg.dimensions[d], tensorInfo.GetShape()[d]);
@@ -88,7 +82,8 @@ using namespace android::hardware;
 namespace armnn_driver
 {
 template<typename HalVersion>
-RequestThread<ArmnnPreparedModel, HalVersion, ArmnnCallback_1_0> ArmnnPreparedModel<HalVersion>::m_RequestThread;
+RequestThread<ArmnnPreparedModel, HalVersion, CallbackContext_1_0>
+    ArmnnPreparedModel<HalVersion>::m_RequestThread;
 
 template<typename HalVersion>
 template <typename TensorBindingCollection>
@@ -97,7 +92,7 @@ void ArmnnPreparedModel<HalVersion>::DumpTensorsIfRequired(char const* tensorNam
 {
     if (!m_RequestInputsAndOutputsDumpDir.empty())
     {
-        const std::string requestName = boost::str(boost::format("%1%_%2%.dump") % m_NetworkId % m_RequestCount);
+        const std::string requestName = std::to_string(m_NetworkId) + "_" + std::to_string(m_RequestCount) + ".dump";
         for (std::size_t i = 0u; i < tensorBindings.size(); ++i)
         {
             DumpTensor(m_RequestInputsAndOutputsDumpDir,
@@ -139,8 +134,9 @@ ArmnnPreparedModel<HalVersion>::~ArmnnPreparedModel()
 }
 
 template<typename HalVersion>
-Return<V1_0::ErrorStatus> ArmnnPreparedModel<HalVersion>::execute(const V1_0::Request& request,
-                                                            const ::android::sp<V1_0::IExecutionCallback>& callback)
+Return<V1_0::ErrorStatus> ArmnnPreparedModel<HalVersion>::execute(
+    const V1_0::Request& request,
+    const ::android::sp<V1_0::IExecutionCallback>& callback)
 {
     ALOGV("ArmnnPreparedModel::execute(): %s", GetModelSummary(m_Model).c_str());
     m_RequestCount++;
@@ -229,7 +225,7 @@ Return<V1_0::ErrorStatus> ArmnnPreparedModel<HalVersion>::execute(const V1_0::Re
         NotifyCallbackAndCheck(callback, errorStatus, callingFunction);
     };
 
-    ArmnnCallback_1_0 armnnCb;
+    CallbackContext_1_0 armnnCb;
     armnnCb.callback = cb;
     // post the request for asynchronous execution
     m_RequestThread.PostMsg(this, pMemPools, pInputTensors, pOutputTensors, armnnCb);
@@ -240,18 +236,18 @@ Return<V1_0::ErrorStatus> ArmnnPreparedModel<HalVersion>::execute(const V1_0::Re
 template<typename HalVersion>
 void ArmnnPreparedModel<HalVersion>::ExecuteGraph(
         std::shared_ptr<std::vector<::android::nn::RunTimePoolInfo>>& pMemPools,
-        std::shared_ptr<armnn::InputTensors>& pInputTensors,
-        std::shared_ptr<armnn::OutputTensors>& pOutputTensors,
-        ArmnnCallback_1_0 cb)
+        armnn::InputTensors& inputTensors,
+        armnn::OutputTensors& outputTensors,
+        CallbackContext_1_0 cb)
 {
     ALOGV("ArmnnPreparedModel::ExecuteGraph(...)");
 
-    DumpTensorsIfRequired("Input", *pInputTensors);
+    DumpTensorsIfRequired("Input", inputTensors);
 
     // run it
     try
     {
-        armnn::Status status = m_Runtime->EnqueueWorkload(m_NetworkId, *pInputTensors, *pOutputTensors);
+        armnn::Status status = m_Runtime->EnqueueWorkload(m_NetworkId, inputTensors, outputTensors);
         if (status != armnn::Status::Success)
         {
             ALOGW("EnqueueWorkload failed");
@@ -272,14 +268,20 @@ void ArmnnPreparedModel<HalVersion>::ExecuteGraph(
         return;
     }
 
-    DumpTensorsIfRequired("Output", *pOutputTensors);
+    DumpTensorsIfRequired("Output", outputTensors);
 
     // Commit output buffers.
     // Note that we update *all* pools, even if they aren't actually used as outputs -
     // this is simpler and is what the CpuExecutor does.
     for (android::nn::RunTimePoolInfo& pool : *pMemPools)
     {
-        pool.flush();
+        // Type android::nn::RunTimePoolInfo has changed between Android P & Q and Android R, where
+        // update() has been removed and flush() added.
+        #if defined(ARMNN_ANDROID_R) // Use the new Android implementation.
+            pool.flush();
+        #else
+            pool.update();
+        #endif
     }
 
     cb.callback(V1_0::ErrorStatus::NONE, "ExecuteGraph");
@@ -290,7 +292,7 @@ bool ArmnnPreparedModel<HalVersion>::ExecuteWithDummyInputs()
 {
     std::vector<std::vector<char>> storage;
     armnn::InputTensors inputTensors;
-    for (unsigned int i = 0; i < m_Model.inputIndexes.size(); i++)
+    for (unsigned int i = 0; i < getMainModel(m_Model).inputIndexes.size(); i++)
     {
         const armnn::TensorInfo inputTensorInfo = m_Runtime->GetInputTensorInfo(m_NetworkId, i);
         storage.emplace_back(inputTensorInfo.GetNumBytes());
@@ -300,7 +302,7 @@ bool ArmnnPreparedModel<HalVersion>::ExecuteWithDummyInputs()
     }
 
     armnn::OutputTensors outputTensors;
-    for (unsigned int i = 0; i < m_Model.outputIndexes.size(); i++)
+    for (unsigned int i = 0; i < getMainModel(m_Model).outputIndexes.size(); i++)
     {
         const armnn::TensorInfo outputTensorInfo = m_Runtime->GetOutputTensorInfo(m_NetworkId, i);
         storage.emplace_back(outputTensorInfo.GetNumBytes());
@@ -344,5 +346,11 @@ template class ArmnnPreparedModel<hal_1_1::HalPolicy>;
 #ifdef ARMNN_ANDROID_NN_V1_2
 template class ArmnnPreparedModel<hal_1_1::HalPolicy>;
 template class ArmnnPreparedModel<hal_1_2::HalPolicy>;
+#endif
+
+#ifdef ARMNN_ANDROID_NN_V1_3
+template class ArmnnPreparedModel<hal_1_1::HalPolicy>;
+template class ArmnnPreparedModel<hal_1_2::HalPolicy>;
+template class ArmnnPreparedModel<hal_1_3::HalPolicy>;
 #endif
 } // namespace armnn_driver

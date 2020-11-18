@@ -1,5 +1,5 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2020 Arm Ltd. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -7,30 +7,31 @@
 
 #include "../ConversionUtils.hpp"
 #include "../ConversionUtils_1_2.hpp"
+#include "../ConversionUtils_1_3.hpp"
 
 #include <HalInterfaces.h>
 
 #include <armnn/Types.hpp>
 
-namespace V1_2 = ::android::hardware::neuralnetworks::V1_2;
+namespace V1_3 = ::android::hardware::neuralnetworks::V1_3;
 
 namespace armnn_driver
 {
-namespace hal_1_2
+namespace hal_1_3
 {
 
 class HalPolicy
 {
 public:
-    using Model                     = V1_2::Model;
-    using Operand                   = V1_2::Operand;
-    using OperandLifeTime           = V1_0::OperandLifeTime;
-    using OperandType               = V1_2::OperandType;
-    using Operation                 = V1_2::Operation;
-    using OperationType             = V1_2::OperationType;
-    using ExecutionCallback         = V1_2::IExecutionCallback;
-    using getSupportedOperations_cb = V1_2::IDevice::getSupportedOperations_1_2_cb;
-    using ErrorStatus               = V1_0::ErrorStatus;
+    using Model                     = V1_3::Model;
+    using Operand                   = V1_3::Operand;
+    using OperandLifeTime           = V1_3::OperandLifeTime;
+    using OperandType               = V1_3::OperandType;
+    using Operation                 = V1_3::Operation;
+    using OperationType             = V1_3::OperationType;
+    using ExecutionCallback         = V1_3::IExecutionCallback;
+    using getSupportedOperations_cb = V1_3::IDevice::getSupportedOperations_1_3_cb;
+    using ErrorStatus               = V1_3::ErrorStatus;
 
     static bool ConvertOperation(const Operation& operation, const Model& model, ConversionData& data);
 
@@ -63,12 +64,16 @@ private:
 
     static bool ConvertDiv(const Operation& operation, const Model& model, ConversionData& data);
 
-    static bool ConvertExpandDims(const Operation& operation, const Model& model, ConversionData& data);
-
     static bool ConvertElementwiseUnary(const Operation& operation,
                                         const Model& model,
                                         ConversionData& data,
                                         armnn::UnaryOperation unaryOperation);
+
+    static bool ConvertElu(const Operation& operation, const Model& model, ConversionData& data);
+
+    static bool ConvertExpandDims(const Operation& operation, const Model& model, ConversionData& data);
+
+    static bool ConvertFill(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertFloor(const Operation& operation, const Model& model, ConversionData& data);
 
@@ -77,6 +82,8 @@ private:
     static bool ConvertGather(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertGroupedConv2d(const Operation& operation, const Model& model, ConversionData& data);
+
+    static bool ConvertHardSwish(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertInstanceNormalization(const Operation& operation, const Model& model, ConversionData& data);
 
@@ -87,6 +94,11 @@ private:
     static bool ConvertLocalResponseNormalization(const Operation& operation,
                                                   const Model& model,
                                                   ConversionData& data);
+
+    static bool ConvertLogicalBinary(const Operation& operation,
+                                     const Model& model,
+                                     ConversionData& data,
+                                     armnn::LogicalBinaryOperation logicalOperation);
 
     static bool ConvertLogistic(const Operation& operation, const Model& model, ConversionData& data);
 
@@ -112,7 +124,11 @@ private:
 
     static bool ConvertQuantize(const Operation& operation, const Model& model, ConversionData& data);
 
+    static bool ConvertQuantizedLstm(const Operation& operation, const Model& model, ConversionData& data);
+
     static bool ConvertQuantized16BitLstm(const Operation& operation, const Model& model, ConversionData& data);
+
+    static bool ConvertRank(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertReLu(const Operation& operation, const Model& model, ConversionData& data);
 
@@ -148,5 +164,5 @@ private:
     static bool ConvertTransposeConv2d(const Operation& operation, const Model& model, ConversionData& data);
 };
 
-} // namespace hal_1_2
+} // namespace hal_1_3
 } // namespace armnn_driver

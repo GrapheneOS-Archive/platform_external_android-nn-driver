@@ -8,12 +8,19 @@
 #include "ArmnnDriverImpl.hpp"
 #include "ArmnnPreparedModel.hpp"
 
-#ifdef ARMNN_ANDROID_NN_V1_2 // Using ::android::hardware::neuralnetworks::V1_2
+#if defined(ARMNN_ANDROID_NN_V1_2) || defined(ARMNN_ANDROID_NN_V1_3) // Using ::android::hardware::neuralnetworks::V1_2
 #include "ArmnnPreparedModel_1_2.hpp"
 #endif
 
+#ifdef ARMNN_ANDROID_NN_V1_3 // Using ::android::hardware::neuralnetworks::V1_2
+#include "ArmnnPreparedModel_1_3.hpp"
+#endif
+
+#include "Utils.hpp"
+
 #include "ModelToINetworkConverter.hpp"
 #include "SystemPropertiesUtils.hpp"
+
 #include <ValidateHal.h>
 #include <log/log.h>
 
@@ -39,14 +46,13 @@ void NotifyCallbackAndCheck(const sp<V1_0::IPreparedModelCallback>& callback,
 }
 
 Return<V1_0::ErrorStatus> FailPrepareModel(V1_0::ErrorStatus error,
-                                     const string& message,
-                                     const sp<V1_0::IPreparedModelCallback>& callback)
+                                           const string& message,
+                                           const sp<V1_0::IPreparedModelCallback>& callback)
 {
     ALOGW("ArmnnDriverImpl::prepareModel: %s", message.c_str());
     NotifyCallbackAndCheck(callback, error, nullptr);
     return error;
 }
-
 
 } // namespace
 
@@ -98,6 +104,17 @@ Return<V1_0::ErrorStatus> ArmnnDriverImpl<HalPolicy>::prepareModel(
     armnn::IOptimizedNetworkPtr optNet(nullptr, nullptr);
     armnn::OptimizerOptions OptOptions;
     OptOptions.m_ReduceFp32ToFp16 = float32ToFloat16;
+
+    armnn::BackendOptions gpuAcc("GpuAcc",
+    {
+        { "FastMathEnabled", options.IsFastMathEnabled() }
+    });
+    armnn::BackendOptions cpuAcc("CpuAcc",
+    {
+        { "FastMathEnabled", options.IsFastMathEnabled() }
+    });
+    OptOptions.m_ModelOptions.push_back(gpuAcc);
+    OptOptions.m_ModelOptions.push_back(cpuAcc);
 
     std::vector<std::string> errMessages;
     try
@@ -203,11 +220,11 @@ Return<void> ArmnnDriverImpl<HalPolicy>::getSupportedOperations(const armnn::IRu
     std::string timestamp;
     if (!options.GetRequestInputsAndOutputsDumpDir().empty())
     {
-        timestamp = GetFileTimestamp();
-        fileName = boost::str(boost::format("%1%/%2%_getSupportedOperations.txt")
-                          % options.GetRequestInputsAndOutputsDumpDir()
-                          % timestamp);
-        ss << " : " << fileName;
+        ss << " : "
+           << options.GetRequestInputsAndOutputsDumpDir()
+           << "/"
+           << GetFileTimestamp()
+           << "_getSupportedOperations.txt";
     }
     ALOGV(ss.str().c_str());
 
@@ -227,14 +244,14 @@ Return<void> ArmnnDriverImpl<HalPolicy>::getSupportedOperations(const armnn::IRu
 
     if (!runtime)
     {
-        cb(V1_0::ErrorStatus::DEVICE_UNAVAILABLE, result);
+        cb(HalErrorStatus::DEVICE_UNAVAILABLE, result);
         return Void();
     }
 
     // Run general model validation, if this doesn't pass we shouldn't analyse the model anyway.
     if (!android::nn::validateModel(model))
     {
-        cb(V1_0::ErrorStatus::INVALID_ARGUMENT, result);
+        cb(HalErrorStatus::INVALID_ARGUMENT, result);
         return Void();
     }
 
@@ -246,20 +263,22 @@ Return<void> ArmnnDriverImpl<HalPolicy>::getSupportedOperations(const armnn::IRu
     if (modelConverter.GetConversionResult() != ConversionResult::Success
             && modelConverter.GetConversionResult() != ConversionResult::UnsupportedFeature)
     {
-        cb(V1_0::ErrorStatus::GENERAL_FAILURE, result);
+        cb(HalErrorStatus::GENERAL_FAILURE, result);
         return Void();
     }
 
     // Check each operation if it was converted successfully and copy the flags
     // into the result (vector<bool>) that we need to return to Android.
-    result.reserve(model.operations.size());
-    for (uint32_t operationIdx = 0; operationIdx < model.operations.size(); operationIdx++)
+    result.reserve(getMainModel(model).operations.size());
+    for (uint32_t operationIdx = 0;
+         operationIdx < getMainModel(model).operations.size();
+         ++operationIdx)
     {
         bool operationSupported = modelConverter.IsOperationSupported(operationIdx);
         result.push_back(operationSupported);
     }
 
-    cb(V1_0::ErrorStatus::NONE, result);
+    cb(HalErrorStatus::NONE, result);
     return Void();
 }
 
@@ -284,6 +303,12 @@ template class ArmnnDriverImpl<hal_1_1::HalPolicy>;
 #ifdef ARMNN_ANDROID_NN_V1_2
 template class ArmnnDriverImpl<hal_1_1::HalPolicy>;
 template class ArmnnDriverImpl<hal_1_2::HalPolicy>;
+#endif
+
+#ifdef ARMNN_ANDROID_NN_V1_3
+template class ArmnnDriverImpl<hal_1_1::HalPolicy>;
+template class ArmnnDriverImpl<hal_1_2::HalPolicy>;
+template class ArmnnDriverImpl<hal_1_3::HalPolicy>;
 #endif
 
 } // namespace armnn_driver

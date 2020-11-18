@@ -6,8 +6,10 @@
 #define LOG_TAG "ArmnnDriver"
 
 #include "ModelToINetworkConverter.hpp"
+#include "Utils.hpp"
 
 #include <log/log.h>
+#include <type_traits>
 
 namespace armnn_driver
 {
@@ -57,26 +59,43 @@ void ModelToINetworkConverter<HalPolicy>::Convert()
         totalPoolSize += pool.size();
     }
 
+    using NetworkOptions = std::vector<armnn::BackendOptions>;
+    NetworkOptions networkOptions;
+    armnn::BackendOptions shapeInferenceMethodOption("ShapeInferenceMethod",
+                                                    {
+                                                            { "InferAndValidate", true }
+                                                    });
+
+    networkOptions.push_back(shapeInferenceMethodOption);
+
     // Create armnn::INetwork
-    m_Data.m_Network = armnn::INetwork::Create();
+    m_Data.m_Network = armnn::INetwork::Create(networkOptions);
 
     // add operations to it
     // track which layer outputs each operand
-    m_Data.m_OutputSlotForOperand = std::vector<armnn::IOutputSlot*>(m_Model.operands.size(), nullptr);
-
+    ALOGV("ModelToINetworkConverter::Convert(): m_OutputSlotForOperand");
+    m_Data.m_OutputSlotForOperand = std::vector<armnn::IOutputSlot*>(getMainModel(m_Model).operands.size(), nullptr);
     try
     {
-        for (uint32_t i = 0; i < m_Model.inputIndexes.size(); i++)
+        ALOGV("ModelToINetworkConverter::Convert(): for getMainModel(m_Model).inputIndexes.size()");
+        for (uint32_t i = 0; i < getMainModel(m_Model).inputIndexes.size(); i++)
         {
+            ALOGV("ModelToINetworkConverter::Convert(): getMainModel(m_Model).inputIndexes[i]");
             // inputs in android nn are represented by operands
-            uint32_t inputIndex = m_Model.inputIndexes[i];
-            const HalOperand& operand = m_Model.operands[inputIndex];
+            uint32_t inputIndex = getMainModel(m_Model).inputIndexes[i];
+            ALOGV("ModelToINetworkConverter::Convert(): getMainModel(m_Model).operands[inputIndex];");
+            const HalOperand& operand = getMainModel(m_Model).operands[inputIndex];
+            ALOGV("ModelToINetworkConverter::Convert(): GetTensorInfoForOperand(operand)");
             const armnn::TensorInfo& tensor = GetTensorInfoForOperand(operand);
+            ALOGV("ModelToINetworkConverter::Convert(): m_Data.m_Network->AddInputLayer(i)");
             armnn::IConnectableLayer* layer = m_Data.m_Network->AddInputLayer(i);
 
+            ALOGV("ModelToINetworkConverter::Convert(): layer->GetOutputSlot(0)");
             armnn::IOutputSlot& outputSlot = layer->GetOutputSlot(0);
+            ALOGV("ModelToINetworkConverter::Convert(): outputSlot.SetTensorInfo(GetTensorInfoForOperand(operand))");
             outputSlot.SetTensorInfo(GetTensorInfoForOperand(operand));
 
+            ALOGV("ModelToINetworkConverter::Convert(): m_Data.m_OutputSlotForOperand[inputIndex] = &outputSlot");
             // store for later layers
             m_Data.m_OutputSlotForOperand[inputIndex] = &outputSlot;
         }
@@ -91,10 +110,10 @@ void ModelToINetworkConverter<HalPolicy>::Convert()
         Fail("%s: Failed to convert input operand to TensorShape: %s", __func__, e.what());
         m_ConversionResult = ConversionResult::UnsupportedFeature;
     }
-
-    for (uint32_t operationIdx = 0; operationIdx < m_Model.operations.size(); operationIdx++)
+    bool UnsupportedDynamicOperation = false;
+    for (uint32_t operationIdx = 0; operationIdx < getMainModel(m_Model).operations.size(); operationIdx++)
     {
-        const auto& operation = m_Model.operations[operationIdx];
+        const auto& operation = getMainModel(m_Model).operations[operationIdx];
 
         bool ok = true;
         if (m_ForcedUnsupportedOperations.find(operationIdx) != m_ForcedUnsupportedOperations.end())
@@ -128,18 +147,42 @@ void ModelToINetworkConverter<HalPolicy>::Convert()
         // We still need to continue and check the other ones.
         if (!ok)
         {
+            if (m_Data.m_DynamicInputsEncountered)
+            {
+                Fail("%s: The unsupported operation at index %i has dynamic inputs.", __func__, operationIdx);
+                UnsupportedDynamicOperation = true;
+            }
+
             m_ConversionResult = ConversionResult::UnsupportedFeature;
         }
+        m_Data.m_DynamicInputsEncountered = false;
     }
+
+    // Due to the NNAPI partitioner not supporting partition boundaries of unknown size,
+    // any operations who's outputs connect to an unsupported operation with with dynamic inputs
+    // will cause a failure.
+
+    // The simplest solution to this problem is to not support any operations in a model containing
+    // an unsupported operation with with dynamic inputs.
+    if (UnsupportedDynamicOperation)
+    {
+        Fail("%s: Unsupported operation with dynamic inputs found. Retroactively setting all operations to unsupported",
+             __func__);
+        for (auto& operation : m_OperationSupported)
+        {
+            operation.second = false;
+        }
+    }
+
     try
     {
         if (m_ConversionResult == ConversionResult::Success)
         {
-            for (uint32_t i = 0; i < m_Model.outputIndexes.size(); i++)
+            for (uint32_t i = 0; i < getMainModel(m_Model).outputIndexes.size(); i++)
             {
                 // outputs in android nn are represented by operands
-                uint32_t outputIndex = m_Model.outputIndexes[i];
-                const HalOperand& operand = m_Model.operands[outputIndex];
+                uint32_t outputIndex = getMainModel(m_Model).outputIndexes[i];
+                const HalOperand& operand = getMainModel(m_Model).operands[outputIndex];
                 const armnn::TensorInfo& tensor = GetTensorInfoForOperand(operand);
                 armnn::IConnectableLayer* layer = m_Data.m_Network->AddOutputLayer(i);
 
@@ -176,6 +219,12 @@ template class ModelToINetworkConverter<hal_1_1::HalPolicy>;
 #ifdef ARMNN_ANDROID_NN_V1_2
 template class ModelToINetworkConverter<hal_1_1::HalPolicy>;
 template class ModelToINetworkConverter<hal_1_2::HalPolicy>;
+#endif
+
+#ifdef ARMNN_ANDROID_NN_V1_3
+template class ModelToINetworkConverter<hal_1_1::HalPolicy>;
+template class ModelToINetworkConverter<hal_1_2::HalPolicy>;
+template class ModelToINetworkConverter<hal_1_3::HalPolicy>;
 #endif
 
 } // armnn_driver

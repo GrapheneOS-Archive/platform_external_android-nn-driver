@@ -1,5 +1,5 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2020 Arm Ltd. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -19,17 +19,16 @@
 namespace armnn_driver
 {
 using TimePoint = std::chrono::steady_clock::time_point;
-static const TimePoint g_Min = std::chrono::steady_clock::time_point::min();
 
 template<template <typename HalVersion> class PreparedModel, typename HalVersion, typename CallbackContext>
-class RequestThread
+class RequestThread_1_3
 {
 public:
     /// Constructor creates the thread
-    RequestThread();
+    RequestThread_1_3();
 
     /// Destructor terminates the thread
-    ~RequestThread();
+    ~RequestThread_1_3();
 
     /// Add a message to the thread queue.
     /// @param[in] model pointer to the prepared model handling the request
@@ -44,8 +43,8 @@ public:
                  CallbackContext callbackContext);
 
 private:
-    RequestThread(const RequestThread&) = delete;
-    RequestThread& operator=(const RequestThread&) = delete;
+    RequestThread_1_3(const RequestThread_1_3&) = delete;
+    RequestThread_1_3& operator=(const RequestThread_1_3&) = delete;
 
     /// storage for a prepared model and args for the asyncExecute call
     struct AsyncExecuteData
@@ -91,13 +90,15 @@ private:
 
     /// Add a prepared thread message to the thread queue.
     /// @param[in] threadMsg the message to add to the queue
-    void PostMsg(std::shared_ptr<ThreadMsg>& pThreadMsg);
+    void PostMsg(std::shared_ptr<ThreadMsg>& pThreadMsg, V1_3::Priority priority = V1_3::Priority::MEDIUM);
 
     /// Entry point for the request thread
     void Process();
 
     std::unique_ptr<std::thread> m_Thread;
-    std::queue<std::shared_ptr<ThreadMsg>> m_Queue;
+    std::queue<std::shared_ptr<ThreadMsg>> m_HighPriorityQueue;
+    std::queue<std::shared_ptr<ThreadMsg>> m_MediumPriorityQueue;
+    std::queue<std::shared_ptr<ThreadMsg>> m_LowPriorityQueue;
     std::mutex m_Mutex;
     std::condition_variable m_Cv;
 };

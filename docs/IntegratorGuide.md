@@ -5,9 +5,11 @@ This document describes how to integrate the Arm NN Android NNAPI driver into an
 
 ### Prerequisites
 
-1. Android source tree for Android P FSK-R3 or later, in the directory `<ANDROID_ROOT>`
-2. Android source tree for Android Q FSK-2 or later, in the directory `<ANDROID_ROOT>`
+1. Android source tree for Android P (we have tested against Android P version 9.0.0_r3) , in the directory `<ANDROID_ROOT>`
+2. Android source tree for Android Q (we have tested against Android Q version 10.0.0_r39), in the directory `<ANDROID_ROOT>`
 3. Mali OpenCL driver integrated into the Android source tree
+
+Note: Arm NN Android NNAPI driver also supports pre-release version of Android R.
 
 ### Procedure
 
@@ -36,6 +38,13 @@ thus the following should be added to `device.mk` instead:
 PRODUCT_PACKAGES += android.hardware.neuralnetworks@1.2-service-armnn
 </pre> `Android.mk` contains the module definition of all three versions (1.0, 1.1 and 1.2) of the ArmNN driver.
 
+For android.hardware.neuralnetworks@1.3 HAL,
+thus the following should be added to `device.mk` instead:
+<pre>
+PRODUCT_PACKAGES += android.hardware.neuralnetworks@1.3-service-armnn
+</pre>
+`Android.mk` contains the module definition of all versions (1.0, 1.1, 1.2 and 1.3) of the ArmNN driver.
+
 Similarly, the Neon, CL or reference backend can be enabled/disabled by setting ARMNN_COMPUTE_CL_ENABLE,
 ARMNN_COMPUTE_NEON_ENABLE or ARMNN_REF_ENABLE in `device.mk`:
 <pre>
@@ -44,6 +53,7 @@ ARMNN_COMPUTE_CL_ENABLE := 1
 
 For Android P and Android Q the vendor manifest.xml requires the Neural Network HAL information.
 For Android P use HAL version 1.1 as below. For Android Q substitute 1.2 where necessary.
+For pre-release support of HAL version 1.3, substitute 1.3 where necessary.
 ```xml
 <hal format="hidl">
     <name>android.hardware.neuralnetworks</name>
@@ -69,7 +79,7 @@ For example, if the ArmNN driver has been built with the NN API 1.0, check for t
 <ANDROID_ROOT>/out/target/product/<product>/system/vendor/bin/hw/android.hardware.neuralnetworks@1.0-service-armnn
 </pre>
 
-Android Q has a different path:
+Android Q and later has a different path:
 <pre>
 <ANDROID_ROOT>/out/target/product/<product>/vendor/bin/hw
 </pre>
@@ -77,9 +87,15 @@ Android Q has a different path:
 ### Testing
 
 1. Run the ArmNN driver service executable in the background.
-The following examples assume that the 1.0 version of the driver is being used:
+Use the corresponding version of the driver for the Android version you are running.
+i.e
+android.hardware.neuralnetworks@1.1-service-armnn for Android P,
+android.hardware.neuralnetworks@1.2-service-armnn for Android Q and
+android.hardware.neuralnetworks@1.3-service-armnn for Android R
 <pre>
-adb shell /system/vendor/bin/hw/android.hardware.neuralnetworks@1.0-service-armnn &
+It is also possible to use a specific backend by using the -c option.
+The following is an example of using the CpuAcc backend for Android Q:
+adb shell /system/vendor/bin/hw/android.hardware.neuralnetworks@1.2-service-armnn -c CpuAcc &
 </pre>
 2. Run some code that exercises the Android Neural Networks API, for example Android's
 `NeuralNetworksTest` unit tests (note this is an optional component that must be built).

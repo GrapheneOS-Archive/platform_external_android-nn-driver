@@ -29,6 +29,7 @@ namespace hal_1_2
 class ArmnnDriver : public ArmnnDevice, public V1_2::IDevice
 {
 public:
+
     ArmnnDriver(DriverOptions options)
         : ArmnnDevice(std::move(options))
     {
@@ -58,7 +59,7 @@ public:
     }
 
     Return<V1_0::ErrorStatus> prepareModel(const V1_0::Model& model,
-                                     const android::sp<V1_0::IPreparedModelCallback>& cb) override
+                                           const android::sp<V1_0::IPreparedModelCallback>& cb) override
     {
         ALOGV("hal_1_2::ArmnnDriver::prepareModel()");
 
@@ -87,8 +88,8 @@ public:
     }
 
     Return<V1_0::ErrorStatus> prepareModel_1_1(const V1_1::Model& model,
-                                         V1_1::ExecutionPreference preference,
-                                         const android::sp<V1_0::IPreparedModelCallback>& cb) override
+                                               V1_1::ExecutionPreference preference,
+                                               const android::sp<V1_0::IPreparedModelCallback>& cb) override
     {
         ALOGV("hal_1_2::ArmnnDriver::prepareModel_1_1()");
 

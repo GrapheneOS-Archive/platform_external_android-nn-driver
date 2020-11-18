@@ -64,7 +64,7 @@ BOOST_AUTO_TEST_CASE(FullyConnected)
     output.location  = outloc;
     output.dimensions = hidl_vec<uint32_t>{};
 
-    Request request = {};
+    V1_0::Request request = {};
     request.inputs  = hidl_vec<RequestArgument>{input};
     request.outputs = hidl_vec<RequestArgument>{output};
 
@@ -77,7 +77,10 @@ BOOST_AUTO_TEST_CASE(FullyConnected)
     float* outdata = static_cast<float*>(static_cast<void*>(outMemory->getPointer()));
 
     // run the execution
-    Execute(preparedModel, request);
+    if (preparedModel.get() != nullptr)
+    {
+        Execute(preparedModel, request);
+    }
 
     // check the result
     BOOST_TEST(outdata[0] == 152);
@@ -87,10 +90,10 @@ BOOST_AUTO_TEST_CASE(TestFullyConnected4dInput)
 {
     auto driver = std::make_unique<ArmnnDriver>(DriverOptions(armnn::Compute::CpuRef));
 
-    ErrorStatus error;
+    V1_0::ErrorStatus error;
     std::vector<bool> sup;
 
-    ArmnnDriver::getSupportedOperations_cb cb = [&](ErrorStatus status, const std::vector<bool>& supported)
+    ArmnnDriver::getSupportedOperations_cb cb = [&](V1_0::ErrorStatus status, const std::vector<bool>& supported)
         {
             error = status;
             sup = supported;
@@ -143,7 +146,7 @@ BOOST_AUTO_TEST_CASE(TestFullyConnected4dInput)
     output.location  = outloc;
     output.dimensions = hidl_vec<uint32_t>{};
 
-    Request request = {};
+    V1_0::Request request = {};
     request.inputs  = hidl_vec<RequestArgument>{input};
     request.outputs = hidl_vec<RequestArgument>{output};
 
@@ -156,7 +159,10 @@ BOOST_AUTO_TEST_CASE(TestFullyConnected4dInput)
     float* outdata = static_cast<float*>(static_cast<void*>(outMemory->getPointer()));
 
     // run the execution
-    Execute(preparedModel, request);
+    if (preparedModel != nullptr)
+    {
+        Execute(preparedModel, request);
+    }
 
     // check the result
     BOOST_TEST(outdata[0] == 1);
@@ -173,10 +179,10 @@ BOOST_AUTO_TEST_CASE(TestFullyConnected4dInputReshape)
 {
     auto driver = std::make_unique<ArmnnDriver>(DriverOptions(armnn::Compute::CpuRef));
 
-    ErrorStatus error;
+    V1_0::ErrorStatus error;
     std::vector<bool> sup;
 
-    ArmnnDriver::getSupportedOperations_cb cb = [&](ErrorStatus status, const std::vector<bool>& supported)
+    ArmnnDriver::getSupportedOperations_cb cb = [&](V1_0::ErrorStatus status, const std::vector<bool>& supported)
         {
             error = status;
             sup = supported;
@@ -229,7 +235,7 @@ BOOST_AUTO_TEST_CASE(TestFullyConnected4dInputReshape)
     output.location  = outloc;
     output.dimensions = hidl_vec<uint32_t>{};
 
-    Request request = {};
+    V1_0::Request request = {};
     request.inputs  = hidl_vec<RequestArgument>{input};
     request.outputs = hidl_vec<RequestArgument>{output};
 
@@ -242,7 +248,10 @@ BOOST_AUTO_TEST_CASE(TestFullyConnected4dInputReshape)
     float* outdata = static_cast<float*>(static_cast<void*>(outMemory->getPointer()));
 
     // run the execution
-    Execute(preparedModel, request);
+    if (preparedModel != nullptr)
+    {
+        Execute(preparedModel, request);
+    }
 
     // check the result
     BOOST_TEST(outdata[0] == 1);

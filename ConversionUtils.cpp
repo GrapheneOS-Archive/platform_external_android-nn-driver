@@ -4,6 +4,7 @@
 //
 
 #include "ConversionUtils.hpp"
+#include <armnnUtils/Permute.hpp>
 
 ///
 /// Helper classes
@@ -30,10 +31,19 @@ bool LayerInputHandle::IsValid() const
 
 void LayerInputHandle::Connect(armnn::IInputSlot& inputSlot)
 {
-    BOOST_ASSERT(IsValid());
+    ARMNN_ASSERT(IsValid());
     if (m_OutputSlot)
     {
         m_OutputSlot->Connect(inputSlot);
+    }
+}
+
+void LayerInputHandle::Disconnect(armnn::IInputSlot& inputSlot)
+{
+    ARMNN_ASSERT(IsValid());
+    if (m_OutputSlot)
+    {
+        m_OutputSlot->Disconnect(inputSlot);
     }
 }
 
@@ -51,7 +61,7 @@ ConstTensorPin::ConstTensorPin(const armnn::TensorInfo& tensorInfo,
                                uint32_t numBytes,
                                const armnn::PermutationVector& mappings)
 {
-    boost::ignore_unused(numBytes);
+    armnn::IgnoreUnused(numBytes);
     assert(tensorInfo.GetNumBytes() == numBytes);
 
     const bool needsSwizzling = (mappings.GetSize() > 0);
@@ -102,7 +112,7 @@ armnn::IConnectableLayer* ProcessActivation(const armnn::TensorInfo& tensorInfo,
                                             armnn::IConnectableLayer* prevLayer,
                                             ConversionData& data)
 {
-    BOOST_ASSERT(prevLayer->GetNumOutputSlots() == 1);
+    ARMNN_ASSERT(prevLayer->GetNumOutputSlots() == 1);
 
     prevLayer->GetOutputSlot(0).SetTensorInfo(tensorInfo);
 

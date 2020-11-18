@@ -12,6 +12,10 @@
 
 #include <armnn/ArmNN.hpp>
 
+#ifdef ARMNN_ANDROID_R
+using namespace android::nn::hal;
+#endif
+
 namespace armnn_driver
 {
 namespace hal_1_0

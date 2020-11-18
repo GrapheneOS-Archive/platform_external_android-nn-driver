@@ -32,9 +32,7 @@ namespace driverTestHelpers
 
 void SetModelFp16Flag(V1_0::Model& model, bool fp16Enabled);
 
-#if defined(ARMNN_ANDROID_NN_V1_1) || defined(ARMNN_ANDROID_NN_V1_2)
 void SetModelFp16Flag(V1_1::Model& model, bool fp16Enabled);
-#endif
 
 template<typename HalPolicy>
 void PaddingTestImpl(android::nn::PaddingScheme paddingScheme, bool fp16Enabled = false)
@@ -93,7 +91,7 @@ void PaddingTestImpl(android::nn::PaddingScheme paddingScheme, bool fp16Enabled 
     output.location        = outloc;
     output.dimensions      = hidl_vec<uint32_t>{};
 
-    Request request = {};
+    V1_0::Request request = {};
     request.inputs  = hidl_vec<RequestArgument>{input};
     request.outputs = hidl_vec<RequestArgument>{output};
 
@@ -106,7 +104,10 @@ void PaddingTestImpl(android::nn::PaddingScheme paddingScheme, bool fp16Enabled 
     float* outdata = reinterpret_cast<float*>(static_cast<void*>(outMemory->getPointer()));
 
     // run the execution
-    Execute(preparedModel, request);
+    if (preparedModel.get() != nullptr)
+    {
+        Execute(preparedModel, request);
+    }
 
     // check the result
     switch (paddingScheme)

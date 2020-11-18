@@ -11,6 +11,9 @@
 #include <armnnUtils/Permute.hpp>
 
 #include <armnn/Utils.hpp>
+#include <armnn/utility/Assert.hpp>
+#include <Filesystem.hpp>
+#include <log/log.h>
 
 #include <cassert>
 #include <cerrno>
@@ -54,6 +57,7 @@ void SwizzleAndroidNn4dTensorToArmNn(const armnn::TensorInfo& tensor, const void
     case armnn::DataType::Float32:
     case armnn::DataType::QAsymmU8:
     case armnn::DataType::QSymmS8:
+    case armnn::DataType::QAsymmS8:
         SwizzleAndroidNn4dTensorToArmNn(tensor.GetShape(), input, output, armnn::GetDataTypeSize(dataType), mappings);
         break;
     default:
@@ -69,13 +73,7 @@ void* GetMemoryFromPool(V1_0::DataLocation location, const std::vector<android::
 
     const android::nn::RunTimePoolInfo& memPool = memPools[location.poolIndex];
 
-    // Type android::nn::RunTimePoolInfo has changed between Android O and Android P, where
-    // "buffer" has been made private and must be accessed via the accessor method "getBuffer".
-#if defined(ARMNN_ANDROID_P) || defined(ARMNN_ANDROID_Q) // Use the new Android implementation.
     uint8_t* memPoolBuffer = memPool.getBuffer();
-#else // Fallback to the old Android O implementation.
-    uint8_t* memPoolBuffer = memPool.buffer;
-#endif
 
     uint8_t* memory = memPoolBuffer + location.offset;
 
@@ -84,7 +82,8 @@ void* GetMemoryFromPool(V1_0::DataLocation location, const std::vector<android::
 
 armnn::TensorInfo GetTensorInfoForOperand(const V1_0::Operand& operand)
 {
-    armnn::DataType type;
+    using namespace armnn;
+    DataType type;
 
     switch (operand.type)
     {
@@ -101,7 +100,30 @@ armnn::TensorInfo GetTensorInfoForOperand(const V1_0::Operand& operand)
             throw UnsupportedOperand<V1_0::OperandType>(operand.type);
     }
 
-    armnn::TensorInfo ret(operand.dimensions.size(), operand.dimensions.data(), type);
+    TensorInfo ret;
+    if (operand.dimensions.size() == 0)
+    {
+        TensorShape tensorShape(Dimensionality::NotSpecified);
+        ret = TensorInfo(tensorShape, type);
+    }
+    else
+    {
+        bool dimensionsSpecificity[5] = { true, true, true, true, true };
+        int count = 0;
+        std::for_each(operand.dimensions.data(),
+                      operand.dimensions.data() +  operand.dimensions.size(),
+                      [&](const unsigned int val)
+                      {
+                          if (val == 0)
+                          {
+                              dimensionsSpecificity[count] = false;
+                          }
+                          count++;
+                      });
+
+        TensorShape tensorShape(operand.dimensions.size(), operand.dimensions.data(), dimensionsSpecificity);
+        ret = TensorInfo(tensorShape, type);
+    }
 
     ret.SetQuantizationScale(operand.scale);
     ret.SetQuantizationOffset(operand.zeroPoint);
@@ -109,7 +131,7 @@ armnn::TensorInfo GetTensorInfoForOperand(const V1_0::Operand& operand)
     return ret;
 }
 
-#ifdef ARMNN_ANDROID_NN_V1_2 // Using ::android::hardware::neuralnetworks::V1_2
+#if defined(ARMNN_ANDROID_NN_V1_2) || defined(ARMNN_ANDROID_NN_V1_3)// Using ::android::hardware::neuralnetworks::V1_2
 
 armnn::TensorInfo GetTensorInfoForOperand(const V1_2::Operand& operand)
 {
@@ -119,6 +141,9 @@ armnn::TensorInfo GetTensorInfoForOperand(const V1_2::Operand& operand)
     DataType type;
     switch (operand.type)
     {
+        case V1_2::OperandType::TENSOR_BOOL8:
+            type = armnn::DataType::Boolean;
+            break;
         case V1_2::OperandType::TENSOR_FLOAT32:
             type = armnn::DataType::Float32;
             break;
@@ -144,11 +169,35 @@ armnn::TensorInfo GetTensorInfoForOperand(const V1_2::Operand& operand)
             throw UnsupportedOperand<V1_2::OperandType>(operand.type);
     }
 
-    TensorInfo ret(operand.dimensions.size(), operand.dimensions.data(), type);
+    TensorInfo ret;
+    if (operand.dimensions.size() == 0)
+    {
+        TensorShape tensorShape(Dimensionality::NotSpecified);
+        ret = TensorInfo(tensorShape, type);
+    }
+    else
+    {
+        bool dimensionsSpecificity[5] = { true, true, true, true, true };
+        int count = 0;
+        std::for_each(operand.dimensions.data(),
+                      operand.dimensions.data() +  operand.dimensions.size(),
+                      [&](const unsigned int val)
+                      {
+                          if (val == 0)
+                          {
+                              dimensionsSpecificity[count] = false;
+                          }
+                          count++;
+                      });
+
+        TensorShape tensorShape(operand.dimensions.size(), operand.dimensions.data(), dimensionsSpecificity);
+        ret = TensorInfo(tensorShape, type);
+    }
+
     if (perChannel)
     {
         // ExtraParams is expected to be of type channelQuant
-        BOOST_ASSERT(operand.extraParams.getDiscriminator() ==
+        ARMNN_ASSERT(operand.extraParams.getDiscriminator() ==
                      V1_2::Operand::ExtraParams::hidl_discriminator::channelQuant);
 
         auto perAxisQuantParams = operand.extraParams.channelQuant();
@@ -167,15 +216,124 @@ armnn::TensorInfo GetTensorInfoForOperand(const V1_2::Operand& operand)
 
 #endif
 
+#ifdef ARMNN_ANDROID_NN_V1_3 // Using ::android::hardware::neuralnetworks::V1_3
+
+armnn::TensorInfo GetTensorInfoForOperand(const V1_3::Operand& operand)
+{
+    using namespace armnn;
+    bool perChannel = false;
+    bool isScalar   = false;
+
+    DataType type;
+    switch (operand.type)
+    {
+        case V1_3::OperandType::TENSOR_BOOL8:
+            type = armnn::DataType::Boolean;
+            break;
+        case V1_3::OperandType::TENSOR_FLOAT32:
+            type = armnn::DataType::Float32;
+            break;
+        case V1_3::OperandType::TENSOR_FLOAT16:
+            type = armnn::DataType::Float16;
+            break;
+        case V1_3::OperandType::TENSOR_QUANT8_ASYMM:
+            type = armnn::DataType::QAsymmU8;
+            break;
+        case V1_3::OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            perChannel=true;
+            ARMNN_FALLTHROUGH;
+        case V1_3::OperandType::TENSOR_QUANT8_SYMM:
+            type = armnn::DataType::QSymmS8;
+            break;
+        case V1_3::OperandType::TENSOR_QUANT16_SYMM:
+            type = armnn::DataType::QSymmS16;
+            break;
+        case V1_3::OperandType::TENSOR_INT32:
+            type = armnn::DataType::Signed32;
+            break;
+        case V1_3::OperandType::INT32:
+            type = armnn::DataType::Signed32;
+            isScalar = true;
+            break;
+        case V1_3::OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
+            type = armnn::DataType::QAsymmS8;
+            break;
+        default:
+            throw UnsupportedOperand<V1_3::OperandType>(operand.type);
+    }
+
+    TensorInfo ret;
+    if (isScalar)
+    {
+        ret = TensorInfo(TensorShape(armnn::Dimensionality::Scalar), type);
+    }
+    else
+    {
+        if (operand.dimensions.size() == 0)
+        {
+            TensorShape tensorShape(Dimensionality::NotSpecified);
+            ret = TensorInfo(tensorShape, type);
+        }
+        else
+        {
+            bool dimensionsSpecificity[5] = { true, true, true, true, true };
+            int count = 0;
+            std::for_each(operand.dimensions.data(),
+                          operand.dimensions.data() +  operand.dimensions.size(),
+                          [&](const unsigned int val)
+                          {
+                              if (val == 0)
+                              {
+                                  dimensionsSpecificity[count] = false;
+                              }
+                              count++;
+                          });
+
+            TensorShape tensorShape(operand.dimensions.size(), operand.dimensions.data(), dimensionsSpecificity);
+            ret = TensorInfo(tensorShape, type);
+        }
+    }
+
+    if (perChannel)
+    {
+        // ExtraParams is expected to be of type channelQuant
+        ARMNN_ASSERT(operand.extraParams.getDiscriminator() ==
+                     V1_2::Operand::ExtraParams::hidl_discriminator::channelQuant);
+
+        auto perAxisQuantParams = operand.extraParams.channelQuant();
+
+        ret.SetQuantizationScales(perAxisQuantParams.scales);
+        ret.SetQuantizationDim(MakeOptional<unsigned int>(perAxisQuantParams.channelDim));
+    }
+    else
+    {
+        ret.SetQuantizationScale(operand.scale);
+        ret.SetQuantizationOffset(operand.zeroPoint);
+    }
+    return ret;
+}
+
+#endif
+
 std::string GetOperandSummary(const V1_0::Operand& operand)
 {
     return android::hardware::details::arrayToString(operand.dimensions, operand.dimensions.size()) + " " +
         toString(operand.type);
 }
 
-#ifdef ARMNN_ANDROID_NN_V1_2 // Using ::android::hardware::neuralnetworks::V1_2
+#if defined(ARMNN_ANDROID_NN_V1_2) || defined(ARMNN_ANDROID_NN_V1_3) // Using ::android::hardware::neuralnetworks::V1_2
 
 std::string GetOperandSummary(const V1_2::Operand& operand)
+{
+    return android::hardware::details::arrayToString(operand.dimensions, operand.dimensions.size()) + " " +
+           toString(operand.type);
+}
+
+#endif
+
+#ifdef ARMNN_ANDROID_NN_V1_3 // Using ::android::hardware::neuralnetworks::V1_3
+
+std::string GetOperandSummary(const V1_3::Operand& operand)
 {
     return android::hardware::details::arrayToString(operand.dimensions, operand.dimensions.size()) + " " +
            toString(operand.type);
@@ -218,10 +376,11 @@ void DumpTensor(const std::string& dumpDir,
     const armnn::ConstTensor& tensor)
 {
     // The dump directory must exist in advance.
-    const std::string fileName = boost::str(boost::format("%1%/%2%_%3%.dump") % dumpDir % requestName % tensorName);
+    fs::path dumpPath = dumpDir;
+    const fs::path fileName = dumpPath / (requestName + "_" + tensorName + ".dump");
 
     std::ofstream fileStream;
-    fileStream.open(fileName, std::ofstream::out | std::ofstream::trunc);
+    fileStream.open(fileName.c_str(), std::ofstream::out | std::ofstream::trunc);
 
     if (!fileStream.good())
     {
@@ -251,6 +410,16 @@ void DumpTensor(const std::string& dumpDir,
         case armnn::DataType::Float16:
         {
             dumpElementFunction = &DumpTensorElement<armnn::Half>;
+            break;
+        }
+        case armnn::DataType::QAsymmS8:
+        {
+            dumpElementFunction = &DumpTensorElement<int8_t, int32_t>;
+            break;
+        }
+        case armnn::DataType::Boolean:
+        {
+            dumpElementFunction = &DumpTensorElement<bool>;
             break;
         }
         default:
@@ -343,17 +512,15 @@ void DumpJsonProfilingIfRequired(bool gpuProfilingEnabled,
         return;
     }
 
-    BOOST_ASSERT(profiler);
+    ARMNN_ASSERT(profiler);
 
     // Set the name of the output profiling file.
-    const std::string fileName = boost::str(boost::format("%1%/%2%_%3%.json")
-                                            % dumpDir
-                                            % std::to_string(networkId)
-                                            % "profiling");
+    fs::path dumpPath = dumpDir;
+    const fs::path fileName = dumpPath / (std::to_string(networkId) + "_profiling.json");
 
     // Open the ouput file for writing.
     std::ofstream fileStream;
-    fileStream.open(fileName, std::ofstream::out | std::ofstream::trunc);
+    fileStream.open(fileName.c_str(), std::ofstream::out | std::ofstream::trunc);
 
     if (!fileStream.good())
     {
@@ -382,9 +549,9 @@ std::string ExportNetworkGraphToDotFile(const armnn::IOptimizedNetwork& optimize
     }
 
     // Set the name of the output .dot file.
-    fileName = boost::str(boost::format("%1%/%2%_networkgraph.dot")
-                          % dumpDir
-                          % timestamp);
+    fs::path dumpPath = dumpDir;
+    fs::path tempFilePath = dumpPath / (timestamp + "_networkgraph.dot");
+    fileName = tempFilePath.string();
 
     ALOGV("Exporting the optimized network graph to file: %s", fileName.c_str());
 
@@ -405,10 +572,27 @@ std::string ExportNetworkGraphToDotFile(const armnn::IOptimizedNetwork& optimize
     return fileName;
 }
 
-bool IsDynamicTensor(const armnn::TensorInfo& outputInfo)
+bool IsDynamicTensor(const armnn::TensorInfo& tensorInfo)
 {
-    // Dynamic tensors have at least one 0-sized dimension
-    return outputInfo.GetNumElements() == 0u;
+    if (tensorInfo.GetShape().GetDimensionality() == armnn::Dimensionality::NotSpecified)
+    {
+        return true;
+    }
+    // Account for the usage of the TensorShape empty constructor
+    if (tensorInfo.GetNumDimensions() == 0)
+    {
+        return true;
+    }
+    return !tensorInfo.GetShape().AreAllDimensionsSpecified();
+}
+
+bool AreDynamicTensorsSupported()
+{
+#if defined(ARMNN_ANDROID_NN_V1_3)
+    return true;
+#else
+    return false;
+#endif
 }
 
 std::string GetFileTimestamp()
@@ -439,9 +623,9 @@ void RenameGraphDotFile(const std::string& oldName, const std::string& dumpDir, 
     {
         return;
     }
-    const std::string newFileName = boost::str(boost::format("%1%/%2%_networkgraph.dot")
-                                               % dumpDir
-                                               % std::to_string(networkId));
+    fs::path dumpPath = dumpDir;
+    const fs::path newFileName = dumpPath / (std::to_string(networkId) + "_networkgraph.dot");
+
     int iRet = rename(oldName.c_str(), newFileName.c_str());
     if (iRet != 0)
     {
@@ -452,6 +636,24 @@ void RenameGraphDotFile(const std::string& oldName, const std::string& dumpDir, 
     }
 }
 
-
-
+void CommitPools(std::vector<::android::nn::RunTimePoolInfo>& memPools)
+{
+    if (memPools.empty())
+    {
+        return;
+    }
+    // Commit output buffers.
+    // Note that we update *all* pools, even if they aren't actually used as outputs -
+    // this is simpler and is what the CpuExecutor does.
+    for (auto& pool : memPools)
+    {
+        // Type android::nn::RunTimePoolInfo has changed between Android P & Q and Android R, where
+        // update() has been removed and flush() added.
+#if defined(ARMNN_ANDROID_R) // Use the new Android implementation.
+        pool.flush();
+#else
+        pool.update();
+#endif
+    }
+}
 } // namespace armnn_driver
