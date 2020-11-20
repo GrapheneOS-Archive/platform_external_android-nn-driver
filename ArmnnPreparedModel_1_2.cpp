@@ -454,13 +454,13 @@ bool ArmnnPreparedModel_1_2<HalVersion>::ExecuteGraph(
 
     DumpTensorsIfRequired("Output", outputTensors);
 
-    if (cb.ctx.measureTimings == MeasureTiming::YES)
+    if (cb.ctx.measureTimings == V1_2::MeasureTiming::YES)
     {
         driverEnd = Now();
         V1_2::Timing timing;
         timing.timeOnDevice = MicrosecondsDuration(deviceEnd, deviceStart);
         timing.timeInDriver = MicrosecondsDuration(driverEnd, cb.ctx.driverStart);
-        ALOGV("ArmnnPreparedModel_1_2::execute timing - Device = %lu Driver = %lu", timing.timeOnDevice,
+        ALOGV("ArmnnPreparedModel_1_2::execute timing - Device = %" PRIu64 " Driver = %" PRIu64, timing.timeOnDevice,
               timing.timeInDriver);
         cb.callback(V1_0::ErrorStatus::NONE, outputShapes, timing, "ArmnnPreparedModel_1_2::ExecuteGraph");
     } else {

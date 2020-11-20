@@ -394,7 +394,7 @@ Return<void> ArmnnPreparedModel_1_3<HalVersion>::executeFenced(const V1_3::Reque
     {
         fenceTiming.timeOnDevice = MicrosecondsDuration(ctx.deviceEnd, ctx.deviceStart);
         fenceTiming.timeInDriver = MicrosecondsDuration(ctx.driverEnd, fenceExecutionStart);
-        ALOGV("ArmnnPreparedModel_1_3::fenceFinishExecutionTiming - Device = %lu Driver = %lu",
+        ALOGV("ArmnnPreparedModel_1_3::fenceFinishExecutionTiming - Device = %" PRIu64 " Driver = %" PRIu64,
               fenceTiming.timeOnDevice, fenceTiming.timeInDriver);
     }
 
@@ -749,7 +749,7 @@ Return <V1_3::ErrorStatus> ArmnnPreparedModel_1_3<HalVersion>::ExecuteGraph(
         Timing timing;
         timing.timeOnDevice = MicrosecondsDuration(cb.ctx.deviceEnd, cb.ctx.deviceStart);
         timing.timeInDriver = MicrosecondsDuration(cb.ctx.driverEnd, cb.ctx.driverStart);
-        ALOGV("ArmnnPreparedModel_1_3::execute timing - Device = %lu Driver = %lu", timing.timeOnDevice,
+        ALOGV("ArmnnPreparedModel_1_3::execute timing - Device = %" PRIu64 " Driver = %" PRIu64, timing.timeOnDevice,
               timing.timeInDriver);
         cb.callback(V1_3::ErrorStatus::NONE, outputShapes, timing, "ArmnnPreparedModel_1_3::ExecuteGraph");
     } else
