@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+/* remove go package, not needed by AOSP build.
 bootstrap_go_package {
     name: "armnn_nn_driver",
     pkgPath: "android-nn-driver",
@@ -19,6 +20,7 @@ bootstrap_go_package {
     ],
     pluginFor: [ "soong_build" ],
 }
+*/
 
 subdirs = [
     "armnn",

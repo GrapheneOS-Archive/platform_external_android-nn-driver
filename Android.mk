@@ -900,7 +900,11 @@ LOCAL_CFLAGS := \
         -std=$(CPP_VERSION) \
         -fexceptions \
         -DARMNN_ANDROID_NN_V1_3 \
-        -DARMNN_ANDROID_R
+        -DARMNN_ANDROID_R \
+        -Wno-unused-variable \
+        -Wno-unneeded-internal-declaration \
+        -Wno-unused-function \
+        -Wno-unused-local-typedef
 
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS += \
@@ -940,8 +944,13 @@ LOCAL_SHARED_LIBRARIES := \
         android.hardware.neuralnetworks@1.3
 
 ifeq ($(ARMNN_INCLUDE_LIBOPENCL),1)
-LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+ifeq (,$(realpath $(TOPDIR)vendor/arm/mali/valhall/Android.bp))
+    LOCAL_SHARED_LIBRARIES += libGLES_mali
+else
+    LOCAL_SHARED_LIBRARIES += libOpenCL
+endif
+LOCAL_LDFLAGS_32 := -Wl,-rpath,/vendor/lib/egl
+LOCAL_LDFLAGS_64 := -Wl,-rpath,/vendor/lib64/egl
 endif
 
 include $(BUILD_EXECUTABLE)
