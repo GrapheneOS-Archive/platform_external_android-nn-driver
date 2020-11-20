@@ -25,7 +25,7 @@ namespace hal_1_3
 class ArmnnDriverImpl
 {
 public:
-    static Return<V1_3::ErrorStatus> prepareArmnnModel_1_3(const armnn::IRuntimePtr& runtime,
+    static android::hardware::Return<V1_3::ErrorStatus> prepareArmnnModel_1_3(const armnn::IRuntimePtr& runtime,
                                                            const armnn::IGpuAccTunedParametersPtr& clTunedParameters,
                                                            const DriverOptions& options,
                                                            const V1_3::Model& model,
@@ -33,7 +33,7 @@ public:
                                                            bool float32ToFloat16 = false,
                                                            V1_3::Priority priority = V1_3::Priority::MEDIUM);
 
-    static Return<void> getCapabilities_1_3(const armnn::IRuntimePtr& runtime,
+    static android::hardware::Return<void> getCapabilities_1_3(const armnn::IRuntimePtr& runtime,
                                             V1_3::IDevice::getCapabilities_1_3_cb cb);
 };
 
