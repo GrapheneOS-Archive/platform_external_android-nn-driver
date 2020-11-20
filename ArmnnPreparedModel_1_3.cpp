@@ -478,7 +478,7 @@ Return<V1_3::ErrorStatus> ArmnnPreparedModel_1_3<HalVersion>::PrepareMemoryForOu
             return V1_3::ErrorStatus::OUTPUT_INSUFFICIENT_SIZE;
         }
 
-        const size_t bufferSize = memPools.at(outputArg.location.poolIndex).getHidlMemory().size();
+        const size_t bufferSize = memPools.at(outputArg.location.poolIndex).getSize();
         if (bufferSize < outputSize)
         {
             ALOGW("ArmnnPreparedModel_1_3::Execute failed bufferSize (%s) < outputSize (%s)",
