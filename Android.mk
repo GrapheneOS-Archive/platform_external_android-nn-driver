@@ -864,8 +864,10 @@ ifeq (,$(realpath $(TOPDIR)vendor/arm/mali/valhall/Android.bp))
 else
     LOCAL_SHARED_LIBRARIES += libOpenCL
 endif
-LOCAL_LDFLAGS_32 := -Wl,-rpath,$(2ND_TARGET_OUT_VENDOR_SHARED_LIBRARIES)/egl
-LOCAL_LDFLAGS_64 := -Wl,-rpath,$(TARGET_OUT_VENDOR_SHARED_LIBRARIES)/egl
+
+
+LOCAL_LDFLAGS_32 := -Wl,-rpath,/vendor/lib/egl
+LOCAL_LDFLAGS_64 := -Wl,-rpath,/vendor/lib64/egl
 endif
 
 include $(BUILD_EXECUTABLE)
