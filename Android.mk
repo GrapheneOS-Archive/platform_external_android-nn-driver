@@ -571,8 +571,11 @@ LOCAL_SHARED_LIBRARIES := \
         android.hardware.neuralnetworks@1.3
 
 ifeq ($(ARMNN_INCLUDE_LIBOPENCL),1)
-LOCAL_SHARED_LIBRARIES+= \
-        libOpenCL
+ifeq (,$(realpath $(TOPDIR)vendor/arm/mali/valhall/Android.bp))
+    LOCAL_SHARED_LIBRARIES += libGLES_mali
+else
+    LOCAL_SHARED_LIBRARIES += libOpenCL
+endif
 endif
 
 include $(BUILD_STATIC_LIBRARY)
