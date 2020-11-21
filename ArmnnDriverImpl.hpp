@@ -11,7 +11,7 @@
 #include <HalInterfaces.h>
 
 #ifdef ARMNN_ANDROID_R
-using namespace android::nn::hal;
+using namespace android::nn;
 #endif
 
 namespace V1_0 = ::android::hardware::neuralnetworks::V1_0;

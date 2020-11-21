@@ -42,7 +42,7 @@ namespace armnn_driver
 ///
 
 #ifdef ARMNN_ANDROID_R
-using OperandType = android::nn::hal::OperandType;
+using OperandType = android::nn::OperandType;
 #endif
 
 struct ConversionData

@@ -9,7 +9,7 @@ LOCAL_PATH := $(ANDROID_NN_DRIVER_LOCAL_PATH)
 P_OR_LATER := 0
 Q_OR_LATER := 0
 R_OR_LATER := 0
-ANDROID_R  := 0
+S_OR_LATER := 0
 
 ifeq ($(PLATFORM_VERSION),9)
 P_OR_LATER := 1
@@ -35,20 +35,19 @@ ifeq ($(PLATFORM_VERSION),S)
 P_OR_LATER := 1
 Q_OR_LATER := 1
 R_OR_LATER := 1
+S_OR_LATER := 1
 endif # PLATFORM_VERSION == S
 
 ifeq ($(PLATFORM_VERSION),R)
 P_OR_LATER := 1
 Q_OR_LATER := 1
 R_OR_LATER := 1
-ANDROID_R  := 1
 endif # PLATFORM_VERSION == R
 
 ifeq ($(PLATFORM_VERSION),11)
 P_OR_LATER := 1
 Q_OR_LATER := 1
 R_OR_LATER := 1
-ANDROID_R  := 1
 endif # PLATFORM_VERSION == 11
 
 CPP_VERSION := c++14
@@ -129,9 +128,13 @@ LOCAL_CFLAGS := \
         -Wno-format-security
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(ANDROID_R),1)
+ifeq ($(R_OR_LATER),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
+endif
+ifeq ($(S_OR_LATER),1)
+LOCAL_CFLAGS+= \
+        -DARMNN_ANDROID_S
 endif
 
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
@@ -262,9 +265,13 @@ LOCAL_CFLAGS+= \
 endif # ARMNN_DRIVER_DEBUG == 1
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(ANDROID_R),1)
+ifeq ($(R_OR_LATER),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
+endif
+ifeq ($(S_OR_LATER),1)
+LOCAL_CFLAGS+= \
+        -DARMNN_ANDROID_S
 endif
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
@@ -382,9 +389,13 @@ LOCAL_CFLAGS+= \
 endif # ARMNN_DRIVER_DEBUG == 1
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(ANDROID_R),1)
+ifeq ($(R_OR_LATER),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
+endif
+ifeq ($(S_OR_LATER),1)
+LOCAL_CFLAGS+= \
+        -DARMNN_ANDROID_S
 endif
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
@@ -494,7 +505,8 @@ LOCAL_CFLAGS := \
         -Werror \
         -Wno-format-security \
         -DARMNN_ANDROID_NN_V1_3 \
-        -DARMNN_ANDROID_R
+        -DARMNN_ANDROID_R \
+        -DARMNN_ANDROID_S
 
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS+= \
@@ -616,9 +628,14 @@ LOCAL_CFLAGS += \
 endif # ARMNN_DRIVER_DEBUG == 1
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(ANDROID_R),1)
+ifeq ($(R_OR_LATER),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
+endif
+
+ifeq ($(S_OR_LATER),1)
+LOCAL_CFLAGS+= \
+        -DARMNN_ANDROID_S
 endif
 
 LOCAL_SRC_FILES := \
@@ -718,9 +735,14 @@ LOCAL_CFLAGS += \
 endif # ARMNN_DRIVER_DEBUG == 1
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(ANDROID_R),1)
+ifeq ($(R_OR_LATER),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
+endif
+
+ifeq ($(S_OR_LATER),1)
+LOCAL_CFLAGS+= \
+        -DARMNN_ANDROID_S
 endif
 
 LOCAL_SRC_FILES := \
@@ -816,9 +838,14 @@ LOCAL_CFLAGS += \
 endif # ARMNN_DRIVER_DEBUG == 1
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(ANDROID_R),1)
+ifeq ($(R_OR_LATER),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
+endif
+
+ifeq ($(S_OR_LATER),1)
+LOCAL_CFLAGS+= \
+        -DARMNN_ANDROID_S
 endif
 
 LOCAL_SRC_FILES := \
@@ -901,6 +928,7 @@ LOCAL_CFLAGS := \
         -fexceptions \
         -DARMNN_ANDROID_NN_V1_3 \
         -DARMNN_ANDROID_R \
+        -DARMNN_ANDROID_S \
         -Wno-unused-variable \
         -Wno-unneeded-internal-declaration \
         -Wno-unused-function \

@@ -30,7 +30,9 @@ namespace V1_3 = ::android::hardware::neuralnetworks::V1_3;
 namespace armnn_driver
 {
 
-#ifdef ARMNN_ANDROID_R
+#ifdef ARMNN_ANDROID_S
+using DataLocation = ::android::nn::DataLocation;
+#elif ARMNN_ANDROID_R
 using DataLocation = ::android::nn::hal::DataLocation;
 #endif
 

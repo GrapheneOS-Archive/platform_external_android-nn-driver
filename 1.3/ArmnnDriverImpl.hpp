@@ -11,7 +11,7 @@
 
 #include <armnn/ArmNN.hpp>
 
-using namespace android::nn::hal;
+using namespace android::nn;
 
 namespace V1_0 = ::android::hardware::neuralnetworks::V1_0;
 namespace V1_2 = ::android::hardware::neuralnetworks::V1_2;
