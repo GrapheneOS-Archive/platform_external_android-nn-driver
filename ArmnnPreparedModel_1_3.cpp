@@ -498,7 +498,7 @@ std::tuple<V1_3::ErrorStatus, hidl_vec<V1_2::OutputShape>, V1_2::Timing, std::st
                                                            std::vector<android::nn::RunTimePoolInfo>& memPools,
                                                            const V1_3::Request& request)
 {
-    if (!setRunTimePoolInfosFromMemoryPools(&memPools, request.pools))
+    if (!setRunTimePoolInfosFromMemoryPools(&memPools, uncheckedConvert(request.pools)))
     {
         return {V1_3::ErrorStatus::INVALID_ARGUMENT, {}, g_NoTiming, "ArmnnPreparedModel_1_3::execute"};
     }
