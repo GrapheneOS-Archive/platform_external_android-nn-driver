@@ -62,7 +62,8 @@ ARMNN_THIRD_PARTY_PATH := $(LOCAL_PATH)/../armnn/third-party
 ARMNN_UTILS_HEADER_PATH := $(LOCAL_PATH)/../armnn/src/armnnUtils
 ARMNN_THIRD_PARTY_PATH := $(LOCAL_PATH)/../armnn/third-party
 OPENCL_HEADER_PATH := $(LOCAL_PATH)/clframework/include
-NN_HEADER_PATH := $(LOCAL_PATH)/../../frameworks/ml/nn/runtime/include
+NN_HEADER_PATH := $(LOCAL_PATH)/../../packages/modules/NeuralNetworks/common/include \
+                  $(LOCAL_PATH)/../../packages/modules/NeuralNetworks/runtime/include
 
 # Variables to control CL/NEON/reference backend support
 # Set them to '0' to disable support for a specific backend
