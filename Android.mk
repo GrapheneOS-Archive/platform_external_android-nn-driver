@@ -68,7 +68,7 @@ NN_HEADER_PATH := $(LOCAL_PATH)/../../packages/modules/NeuralNetworks/common/inc
 # Variables to control CL/NEON/reference backend support
 # Set them to '0' to disable support for a specific backend
 ARMNN_COMPUTE_CL_ENABLED := 0
-ARMNN_COMPUTE_NEON_ENABLED := 1
+ARMNN_COMPUTE_NEON_ENABLED := 0
 ARMNN_REF_ENABLED := 1
 ARMNN_ETHOSN_ENABLED := 1
 
@@ -76,8 +76,8 @@ ifeq ($(ARMNN_COMPUTE_CL_ENABLE),1)
 ARMNN_COMPUTE_CL_ENABLED := 1
 endif
 
-ifeq ($(ARMNN_COMPUTE_NEON_ENABLE),0)
-ARMNN_COMPUTE_NEON_ENABLED := 0
+ifeq ($(ARMNN_COMPUTE_NEON_ENABLE),1)
+ARMNN_COMPUTE_NEON_ENABLED := 1
 endif
 
 ifeq ($(ARMNN_REF_ENABLE),0)
