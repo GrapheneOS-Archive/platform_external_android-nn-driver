@@ -8,6 +8,7 @@
 
 #include <CpuExecutor.h>
 #include <HalInterfaces.h>
+#include <LegacyHalUtils.h>
 #include <NeuralNetworks.h>
 #include "NamespaceAdaptor.hpp"
 
