@@ -103,6 +103,9 @@ RETIRE_RATE := 3
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libarmnn-driver@1.0
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0 SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/LICENSE
 ifeq ($(Q_OR_LATER),1)
 # "eng" is deprecated in Android Q
 LOCAL_MODULE_TAGS := optional
@@ -233,6 +236,9 @@ ifeq ($(P_OR_LATER),1)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libarmnn-driver@1.1
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0 SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/LICENSE
 ifeq ($(Q_OR_LATER),1)
 # "eng" is deprecated in Android Q
 LOCAL_MODULE_TAGS := optional
@@ -363,6 +369,9 @@ ifeq ($(Q_OR_LATER),1)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libarmnn-driver@1.2
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0 SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/LICENSE
 LOCAL_MODULE_TAGS := optional
 LOCAL_ARM_MODE := arm
 LOCAL_PROPRIETARY_MODULE := true
@@ -486,6 +495,9 @@ ifeq ($(R_OR_LATER),1)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libarmnn-driver@1.3
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0 SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/LICENSE
 LOCAL_MODULE_TAGS := optional
 LOCAL_ARM_MODE := arm
 LOCAL_PROPRIETARY_MODULE := true
@@ -601,6 +613,9 @@ endif # PLATFORM_VERSION == R
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := android.hardware.neuralnetworks@1.0-service-armnn
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0 SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/LICENSE
 LOCAL_INIT_RC := android.hardware.neuralnetworks@1.0-service-armnn.rc
 ifeq ($(Q_OR_LATER),1)
 # "eng" is deprecated in Android Q
@@ -707,6 +722,9 @@ ifeq ($(P_OR_LATER),1)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := android.hardware.neuralnetworks@1.1-service-armnn
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0 SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/LICENSE
 LOCAL_INIT_RC := android.hardware.neuralnetworks@1.1-service-armnn.rc
 ifeq ($(Q_OR_LATER),1)
 # "eng" is deprecated in Android Q
@@ -811,6 +829,9 @@ ifeq ($(Q_OR_LATER),1)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := android.hardware.neuralnetworks@1.2-service-armnn
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0 SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/LICENSE
 LOCAL_INIT_RC := android.hardware.neuralnetworks@1.2-service-armnn.rc
 LOCAL_MODULE_TAGS := optional
 LOCAL_ARM_MODE := arm
@@ -911,6 +932,9 @@ ifeq ($(R_OR_LATER),1)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := android.hardware.neuralnetworks@1.3-service-armnn
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0 SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/LICENSE
 LOCAL_INIT_RC := android.hardware.neuralnetworks@1.3-service-armnn.rc
 LOCAL_MODULE_TAGS := optional
 LOCAL_ARM_MODE := arm
