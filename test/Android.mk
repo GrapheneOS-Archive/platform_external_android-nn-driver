@@ -20,6 +20,9 @@ ARMNN_DRIVER_HEADER_PATH := $(LOCAL_PATH)/..
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := armnn-driver-tests@1.0
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../LICENSE
 ifeq ($(Q_OR_LATER),1)
 # "eng" is deprecated in Android Q
 LOCAL_MODULE_TAGS := optional
@@ -129,6 +132,9 @@ ifeq ($(P_OR_LATER),1)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := armnn-driver-tests@1.1
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../LICENSE
 ifeq ($(Q_OR_LATER),1)
 # "eng" is deprecated in Android Q
 LOCAL_MODULE_TAGS := optional
@@ -239,6 +245,9 @@ ifeq ($(Q_OR_LATER),1)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := armnn-driver-tests@1.2
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../LICENSE
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_ARM_MODE := arm
@@ -340,6 +349,9 @@ ifeq ($(R_OR_LATER),1)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := armnn-driver-tests@1.3
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-MIT
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../LICENSE
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_ARM_MODE := arm
