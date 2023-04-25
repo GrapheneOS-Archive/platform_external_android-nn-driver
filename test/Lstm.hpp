@@ -1,5 +1,5 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -9,12 +9,15 @@
 
 #include <armnn/utility/IgnoreUnused.hpp>
 
-#include <boost/math/special_functions/relative_difference.hpp>
-
 #include <array>
 
 using ArmnnDriver   = armnn_driver::ArmnnDriver;
 using DriverOptions = armnn_driver::DriverOptions;
+using RequestArgument = V1_0::RequestArgument;
+
+#ifdef ARMNN_ANDROID_S
+#include <nnapi/Types.h>
+#endif
 
 using namespace driverTestHelpers;
 using namespace android::hardware;
@@ -25,7 +28,7 @@ namespace
 template<typename T>
 RequestArgument CreateRequestArgument(const std::vector<T>& value, unsigned int poolIndex)
 {
-    DataLocation inputInloc = {};
+    V1_0::DataLocation inputInloc = {};
     inputInloc.poolIndex = poolIndex;
     inputInloc.offset = 0;
     inputInloc.length = value.size() * sizeof(T);
@@ -33,26 +36,6 @@ RequestArgument CreateRequestArgument(const std::vector<T>& value, unsigned int 
     inputRequestArgument.location = inputInloc;
     inputRequestArgument.dimensions = hidl_vec<uint32_t>{};
     return inputRequestArgument;
-}
-
-// Returns true if the relative difference between two float values is less than the tolerance value given.
-// This is used because the floating point comparison tolerance (set on each BOOST_AUTO_TEST_CASE) does not work!
-bool TolerantCompareEqual(float a, float b, float tolerance = 0.00001f)
-{
-    float rd;
-    if (a == 0.0f)
-    {
-        rd = fabs(b);
-    }
-    else if (b == 0.0f)
-    {
-        rd = fabs(a);
-    }
-    else
-    {
-        rd = boost::math::relative_difference(a, b);
-    }
-    return rd < tolerance;
 }
 
 // Helper function to create an OperandLifeTime::NO_VALUE for testing.
@@ -94,12 +77,6 @@ void ExecuteModel<armnn_driver::hal_1_2::HalPolicy::Model>(const armnn_driver::h
 #endif
 
 } // anonymous namespace
-
-#ifndef ARMCOMPUTECL_ENABLED
-static const std::array<armnn::Compute, 1> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef }};
-#else
-static const std::array<armnn::Compute, 2> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef, armnn::Compute::GpuAcc }};
-#endif
 
 // Add our own tests here since we fail the lstm tests which Google supplies (because of non-const weights)
 template <typename HalPolicy>
@@ -389,18 +366,20 @@ void LstmTestImpl(const hidl_vec<uint32_t>&   inputDimensions,
     // check the results
     for (size_t i = 0; i < outputStateOutValue.size(); ++i)
     {
-        BOOST_TEST(TolerantCompareEqual(outputStateOutValue[i], outputStateOutData[i]),
-                   "outputStateOut[" << i << "]: " << outputStateOutValue[i] << " != " << outputStateOutData[i]);
+        DOCTEST_CHECK_MESSAGE(outputStateOutValue[i] == doctest::Approx( outputStateOutData[i] ),
+                              "outputStateOut[" << i << "]: " << outputStateOutValue[i] << " != "
+                              << outputStateOutData[i]);
     }
     for (size_t i = 0; i < cellStateOutValue.size(); ++i)
     {
-        BOOST_TEST(TolerantCompareEqual(cellStateOutValue[i], cellStateOutData[i]),
-                   "cellStateOut[" << i << "]: " << cellStateOutValue[i] << " != " << cellStateOutData[i]);
+        DOCTEST_CHECK_MESSAGE(cellStateOutValue[i] == doctest::Approx( cellStateOutData[i] ),
+                              "cellStateOutValue[" << i << "]: " << cellStateOutValue[i] << " != "
+                              << cellStateOutData[i]);
     }
     for (size_t i = 0; i < outputValue.size(); ++i)
     {
-        BOOST_TEST(TolerantCompareEqual(outputValue[i], outputData[i]),
-                   "output[" << i << "]: " << outputValue[i] << " != " << outputData[i]);
+        DOCTEST_CHECK_MESSAGE(outputValue[i] == doctest::Approx( outputData[i] ),
+                              "outputValue[" << i << "]: " << outputValue[i] << " != " << outputData[i]);
     }
 }
 
@@ -664,13 +643,14 @@ void QuantizedLstmTestImpl(const hidl_vec<uint32_t>&    inputDimensions,
     // check the results
     for (size_t i = 0; i < cellStateOutValue.size(); ++i)
     {
-        BOOST_TEST(TolerantCompareEqual(cellStateOutValue[i], cellStateOutData[i], 1.0f),
-                   "cellStateOut[" << i << "]: " << cellStateOutValue[i] << " != " << cellStateOutData[i]);
+        DOCTEST_CHECK_MESSAGE(cellStateOutValue[i] == doctest::Approx( cellStateOutData[i] ),
+                              "cellStateOutValue[" << i << "]: " << cellStateOutValue[i] << " != "
+                              << cellStateOutData[i]);
     }
     for (size_t i = 0; i < outputValue.size(); ++i)
     {
-        BOOST_TEST(TolerantCompareEqual(outputValue[i], outputData[i], 1.0f),
-                   "output[" << i << "]: " << outputValue[i] << " != " << outputData[i]);
+        DOCTEST_CHECK_MESSAGE(outputValue[i] == doctest::Approx( outputData[i] ),
+                              "outputValue[" << i << "]: " << outputValue[i] << " != " << outputData[i]);
     }
 }
 
