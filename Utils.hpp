@@ -1,5 +1,5 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017-2021,2023 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -8,9 +8,10 @@
 
 #include <CpuExecutor.h>
 #include <HalInterfaces.h>
-#include <LegacyHalUtils.h>
 #include <NeuralNetworks.h>
-#include "NamespaceAdaptor.hpp"
+#include <Utils.h>
+
+#include <fmt/format.h>
 
 #include <vector>
 #include <string>
@@ -31,9 +32,7 @@ namespace V1_3 = ::android::hardware::neuralnetworks::V1_3;
 namespace armnn_driver
 {
 
-#ifdef ARMNN_ANDROID_S
-using DataLocation = ::android::nn::DataLocation;
-#elif ARMNN_ANDROID_R
+#ifdef ARMNN_ANDROID_R
 using DataLocation = ::android::nn::hal::DataLocation;
 #endif
 
@@ -63,7 +62,7 @@ public:
 };
 
 /// Swizzles tensor data in @a input according to the dimension mappings.
-void SwizzleAndroidNn4dTensorToArmNn(const armnn::TensorInfo& tensor, const void* input, void* output,
+void SwizzleAndroidNn4dTensorToArmNn(armnn::TensorInfo& tensor, const void* input, void* output,
                                      const armnn::PermutationVector& mappings);
 
 /// Returns a pointer to a specific location in a pool
@@ -73,22 +72,25 @@ void* GetMemoryFromPool(V1_0::DataLocation location,
 /// Can throw UnsupportedOperand
 armnn::TensorInfo GetTensorInfoForOperand(const V1_0::Operand& operand);
 
+std::string GetOperandSummary(const V1_0::Operand& operand);
+
+// Returns true for any quantized data type, false for the rest.
+bool isQuantizedOperand(const V1_0::OperandType& operandType);
+
 #if defined(ARMNN_ANDROID_NN_V1_2) || defined(ARMNN_ANDROID_NN_V1_3) // Using ::android::hardware::neuralnetworks::V1_2
 armnn::TensorInfo GetTensorInfoForOperand(const V1_2::Operand& operand);
+
+std::string GetOperandSummary(const V1_2::Operand& operand);
+
+bool isQuantizedOperand(const V1_2::OperandType& operandType);
 #endif
 
 #ifdef ARMNN_ANDROID_NN_V1_3 // Using ::android::hardware::neuralnetworks::V1_3
 armnn::TensorInfo GetTensorInfoForOperand(const V1_3::Operand& operand);
-#endif
 
-std::string GetOperandSummary(const V1_0::Operand& operand);
-
-#if defined(ARMNN_ANDROID_NN_V1_2) || defined(ARMNN_ANDROID_NN_V1_3) // Using ::android::hardware::neuralnetworks::V1_2
-std::string GetOperandSummary(const V1_2::Operand& operand);
-#endif
-
-#ifdef ARMNN_ANDROID_NN_V1_3 // Using ::android::hardware::neuralnetworks::V1_3
 std::string GetOperandSummary(const V1_3::Operand& operand);
+
+bool isQuantizedOperand(const V1_3::OperandType& operandType);
 #endif
 
 template <typename HalModel>
@@ -126,10 +128,11 @@ std::string GetModelSummary(const HalModel& model)
     return result.str();
 }
 
+template <typename TensorType>
 void DumpTensor(const std::string& dumpDir,
                 const std::string& requestName,
                 const std::string& tensorName,
-                const armnn::ConstTensor& tensor);
+                const TensorType& tensor);
 
 void DumpJsonProfilingIfRequired(bool gpuProfilingEnabled,
                                  const std::string& dumpDir,
@@ -139,7 +142,20 @@ void DumpJsonProfilingIfRequired(bool gpuProfilingEnabled,
 std::string ExportNetworkGraphToDotFile(const armnn::IOptimizedNetwork& optimizedNetwork,
                                         const std::string& dumpDir);
 
-void RenameGraphDotFile(const std::string& oldName, const std::string& dumpDir, const armnn::NetworkId networkId);
+std::string SerializeNetwork(const armnn::INetwork& network,
+                             const std::string& dumpDir,
+                             std::vector<uint8_t>& dataCacheData,
+                             bool dataCachingActive = true);
+
+void RenameExportedFiles(const std::string& existingSerializedFileName,
+                         const std::string& existingDotFileName,
+                         const std::string& dumpDir,
+                         const armnn::NetworkId networkId);
+
+void RenameFile(const std::string& existingName,
+                const std::string& extension,
+                const std::string& dumpDir,
+                const armnn::NetworkId networkId);
 
 /// Checks if a tensor info represents a dynamic tensor
 bool IsDynamicTensor(const armnn::TensorInfo& outputInfo);
@@ -180,4 +196,9 @@ inline V1_2::OutputShape ComputeShape(const armnn::TensorInfo& info)
 
 void CommitPools(std::vector<::android::nn::RunTimePoolInfo>& memPools);
 
+template <typename ErrorStatus, typename Request>
+ErrorStatus ValidateRequestArgument(const Request& request,
+                                    const armnn::TensorInfo& tensorInfo,
+                                    const V1_0::RequestArgument& requestArgument,
+                                    std::string descString);
 } // namespace armnn_driver
