@@ -4,11 +4,18 @@
 //
 
 #include "../DriverTestHelpers.hpp"
+#include "../TestTensor.hpp"
 
-#include <1.3/HalPolicy.hpp>
+#include "../1.3/HalPolicy.hpp"
 
-DOCTEST_TEST_SUITE("QosTests")
-{
+#include <armnn/utility/IgnoreUnused.hpp>
+
+#include <boost/test/unit_test.hpp>
+#include <boost/test/data/test_case.hpp>
+
+
+BOOST_AUTO_TEST_SUITE(QosTests)
+
 using ArmnnDriver   = armnn_driver::ArmnnDriver;
 using DriverOptions = armnn_driver::DriverOptions;
 
@@ -33,7 +40,13 @@ void ExecuteModel(const armnn_driver::hal_1_3::HalPolicy::Model& model,
     }
 }
 
-DOCTEST_TEST_CASE("ConcurrentExecuteWithQosPriority")
+#ifndef ARMCOMPUTECL_ENABLED
+static const std::array<armnn::Compute, 1> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef }};
+#else
+static const std::array<armnn::Compute, 2> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef, armnn::Compute::CpuAcc }};
+#endif
+
+BOOST_AUTO_TEST_CASE(ConcurrentExecuteWithQosPriority)
 {
     ALOGI("ConcurrentExecuteWithQOSPriority: entry");
 
@@ -89,24 +102,24 @@ DOCTEST_TEST_CASE("ConcurrentExecuteWithQosPriority")
         preparedModelsSize++;
     }
 
-    DOCTEST_CHECK(maxRequests == preparedModelsSize);
+    BOOST_TEST(maxRequests == preparedModelsSize);
 
     // construct the request data
-    V1_0::DataLocation inloc = {};
-    inloc.poolIndex          = 0;
-    inloc.offset             = 0;
-    inloc.length             = 3 * sizeof(float);
-    RequestArgument input    = {};
-    input.location           = inloc;
-    input.dimensions         = hidl_vec<uint32_t>{};
+    DataLocation inloc = {};
+    inloc.poolIndex = 0;
+    inloc.offset    = 0;
+    inloc.length    = 3 * sizeof(float);
+    RequestArgument input = {};
+    input.location = inloc;
+    input.dimensions = hidl_vec<uint32_t>{};
 
-    V1_0::DataLocation outloc = {};
-    outloc.poolIndex          = 1;
-    outloc.offset             = 0;
-    outloc.length             = 1 * sizeof(float);
-    RequestArgument output    = {};
-    output.location           = outloc;
-    output.dimensions         = hidl_vec<uint32_t>{};
+    DataLocation outloc = {};
+    outloc.poolIndex = 1;
+    outloc.offset    = 0;
+    outloc.length    = 1 * sizeof(float);
+    RequestArgument output = {};
+    output.location  = outloc;
+    output.dimensions = hidl_vec<uint32_t>{};
 
     // build the requests
     V1_0::Request requests[maxRequests];
@@ -149,7 +162,7 @@ DOCTEST_TEST_CASE("ConcurrentExecuteWithQosPriority")
     ALOGI("ConcurrentExecuteWithQOSPriority: waiting for callbacks");
     for (size_t i = 0; i < maxRequests; ++i)
     {
-        DOCTEST_CHECK(cb[i]);
+        ARMNN_ASSERT(cb[i]);
         cb[i]->wait();
     }
 
@@ -159,15 +172,15 @@ DOCTEST_TEST_CASE("ConcurrentExecuteWithQosPriority")
     {
         if (i < 15)
         {
-            DOCTEST_CHECK(outdata[i][0] == 152);
+            BOOST_TEST(outdata[i][0] == 152);
         }
         else if (i < 30)
         {
-            DOCTEST_CHECK(outdata[i][0] == 141);
+            BOOST_TEST(outdata[i][0] == 141);
         }
         else
         {
-            DOCTEST_CHECK(outdata[i][0] == 159);
+            BOOST_TEST(outdata[i][0] == 159);
         }
 
     }
@@ -176,4 +189,4 @@ DOCTEST_TEST_CASE("ConcurrentExecuteWithQosPriority")
 
 } // anonymous namespace
 
-}
+BOOST_AUTO_TEST_SUITE_END()
