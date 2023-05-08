@@ -6,12 +6,15 @@
 #pragma once
 
 #include "DriverOptions.hpp"
-#include "NamespaceAdaptor.hpp"
 
 #include <HalInterfaces.h>
 
 #ifdef ARMNN_ANDROID_R
-using namespace android::nn;
+using namespace android::nn::hal;
+#endif
+
+#ifdef ARMNN_ANDROID_S
+using namespace android::hardware;
 #endif
 
 namespace V1_0 = ::android::hardware::neuralnetworks::V1_0;

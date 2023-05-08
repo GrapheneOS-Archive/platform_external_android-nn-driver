@@ -1,5 +1,5 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 #pragma once
@@ -10,11 +10,20 @@
 
 #include "../ArmnnDriver.hpp"
 #include <iosfwd>
-#include <boost/test/unit_test.hpp>
-
 #include <android/hidl/allocator/1.0/IAllocator.h>
 
+// Some of the short name macros from 'third-party/doctest/doctest.h' clash with macros in
+// 'system/core/base/include/android-base/logging.h' so we use the full DOCTEST macro names
+#ifndef DOCTEST_CONFIG_NO_SHORT_MACRO_NAMES
+#define DOCTEST_CONFIG_NO_SHORT_MACRO_NAMES
+#endif // DOCTEST_CONFIG_NO_SHORT_MACRO_NAMES
+
+#include <doctest/doctest.h>
+
+using RequestArgument = V1_0::RequestArgument;
 using ::android::hidl::allocator::V1_0::IAllocator;
+
+using ::android::hidl::memory::V1_0::IMemory;
 
 namespace android
 {
@@ -164,7 +173,7 @@ android::sp<IMemory> AddPoolAndGetData(uint32_t size, V1_0::Request& request)
 
     android::sp<IAllocator> allocator = IAllocator::getService("ashmem");
     allocator->allocate(sizeof(T) * size, [&](bool success, const hidl_memory& mem) {
-        BOOST_TEST(success);
+        DOCTEST_CHECK(success);
         pool = mem;
     });
 
@@ -177,13 +186,15 @@ android::sp<IMemory> AddPoolAndGetData(uint32_t size, V1_0::Request& request)
 }
 
 template<typename T>
-void AddPoolAndSetData(uint32_t size, V1_0::Request& request, const T* data)
+android::sp<IMemory> AddPoolAndSetData(uint32_t size, V1_0::Request& request, const T* data)
 {
     android::sp<IMemory> memory = AddPoolAndGetData<T>(size, request);
 
     T* dst = static_cast<T*>(static_cast<void*>(memory->getPointer()));
 
     memcpy(dst, data, size * sizeof(T));
+
+    return memory;
 }
 
 template<typename HalPolicy,
@@ -202,7 +213,7 @@ void AddBoolOperand(HalModel& model, bool value, uint32_t numberOfConsumers = 1)
     using HalOperandType     = typename HalPolicy::OperandType;
     using HalOperandLifeTime = typename HalPolicy::OperandLifeTime;
 
-    DataLocation location = {};
+    V1_0::DataLocation location = {};
     location.offset = model.operandValues.size();
     location.length = sizeof(uint8_t);
 
@@ -420,7 +431,7 @@ void AddTensorOperand(HalModel& model,
         totalElements *= dim;
     }
 
-    DataLocation location = {};
+    V1_0::DataLocation location = {};
     location.length = totalElements * sizeof(T);
 
     if(operandLifeTime == HalOperandLifeTime::CONSTANT_COPY)
@@ -477,7 +488,7 @@ void AddIntOperand(HalModel& model, int32_t value, uint32_t numberOfConsumers = 
     using HalOperandType     = typename HalPolicy::OperandType;
     using HalOperandLifeTime = typename HalPolicy::OperandLifeTime;
 
-    DataLocation location = {};
+    V1_0::DataLocation location = {};
     location.offset = model.operandValues.size();
     location.length = sizeof(int32_t);
 
@@ -503,7 +514,7 @@ void AddFloatOperand(HalModel& model,
     using HalOperandType     = typename HalPolicy::OperandType;
     using HalOperandLifeTime = typename HalPolicy::OperandLifeTime;
 
-    DataLocation location = {};
+    V1_0::DataLocation location = {};
     location.offset = model.operandValues.size();
     location.length = sizeof(float);
 
