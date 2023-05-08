@@ -28,6 +28,7 @@ public:
     const std::string& GetServiceName() const { return m_ServiceName; }
     const std::set<unsigned int>& GetForcedUnsupportedOperations() const { return m_ForcedUnsupportedOperations; }
     const std::string& GetClTunedParametersFile() const { return m_ClTunedParametersFile; }
+    const std::string& GetClMLGOTunedParametersFile() const { return m_ClMLGOTunedParametersFile; }
     armnn::IGpuAccTunedParameters::Mode GetClTunedParametersMode() const { return m_ClTunedParametersMode; }
     armnn::IGpuAccTunedParameters::TuningLevel GetClTuningLevel() const { return m_ClTuningLevel; }
     bool IsGpuProfilingEnabled() const { return m_EnableGpuProfiling; }
@@ -36,6 +37,13 @@ public:
     void SetBackends(const std::vector<armnn::BackendId>& backends) { m_Backends = backends; }
     bool ShouldExit() const { return m_ShouldExit; }
     int GetExitCode() const { return m_ExitCode; }
+    const std::string& GetCachedNetworkFilePath() const { return m_CachedNetworkFilePath; }
+    bool SaveCachedNetwork() const { return m_SaveCachedNetwork; }
+    unsigned int GetNumberOfThreads() const { return m_NumberOfThreads; }
+    bool isAsyncModelExecutionEnabled() const { return m_EnableAsyncModelExecution; };
+    unsigned int getNoOfArmnnThreads() const { return m_ArmnnNumberOfThreads; };
+    bool isImportEnabled() const { return m_EnableImport; };
+    bool isExportEnabled() const { return m_EnableExport; };
 
 private:
     std::vector<armnn::BackendId> m_Backends;
@@ -44,6 +52,7 @@ private:
     std::string m_ServiceName;
     std::set<unsigned int> m_ForcedUnsupportedOperations;
     std::string m_ClTunedParametersFile;
+    std::string m_ClMLGOTunedParametersFile;
     armnn::IGpuAccTunedParameters::Mode m_ClTunedParametersMode;
     armnn::IGpuAccTunedParameters::TuningLevel m_ClTuningLevel;
     bool m_EnableGpuProfiling;
@@ -51,6 +60,13 @@ private:
     bool m_FastMathEnabled;
     bool m_ShouldExit;
     int m_ExitCode;
+    std::string m_CachedNetworkFilePath;
+    bool m_SaveCachedNetwork;
+    unsigned int m_NumberOfThreads;
+    bool m_EnableAsyncModelExecution;
+    unsigned int m_ArmnnNumberOfThreads;
+    bool m_EnableImport;
+    bool m_EnableExport;
 };
 
 } // namespace armnn_driver
