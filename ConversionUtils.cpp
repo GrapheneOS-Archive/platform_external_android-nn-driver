@@ -1,5 +1,5 @@
 //
-// Copyright © 2017,2022 Arm Ltd and Contributors. All rights reserved.
+// Copyright © 2017 Arm Ltd. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -31,11 +31,7 @@ bool LayerInputHandle::IsValid() const
 
 void LayerInputHandle::Connect(armnn::IInputSlot& inputSlot)
 {
-    if (!IsValid())
-    {
-        throw armnn::RuntimeException("LayerInputHandle is invalid");
-    }
-
+    ARMNN_ASSERT(IsValid());
     if (m_OutputSlot)
     {
         m_OutputSlot->Connect(inputSlot);
@@ -44,10 +40,7 @@ void LayerInputHandle::Connect(armnn::IInputSlot& inputSlot)
 
 void LayerInputHandle::Disconnect(armnn::IInputSlot& inputSlot)
 {
-    if (!IsValid())
-    {
-        throw armnn::RuntimeException("LayerInputHandle is invalid");
-    }
+    ARMNN_ASSERT(IsValid());
     if (m_OutputSlot)
     {
         m_OutputSlot->Disconnect(inputSlot);
@@ -59,37 +52,17 @@ const armnn::TensorInfo& LayerInputHandle::GetTensorInfo() const
     return m_TensorInfo;
 }
 
-void LayerInputHandle::SanitizeQuantizationScale(LayerInputHandle& weight,
-                                                 LayerInputHandle& input)
-{
-    if (m_OutputSlot)
-    {
-        armnn::TensorInfo weightInfo = weight.GetTensorInfo();
-        armnn::TensorInfo inputInfo = input.GetTensorInfo();
-        armnn::TensorInfo biasInfo = GetTensorInfo();
-
-        SanitizeBiasQuantizationScale(biasInfo, weightInfo, inputInfo);
-
-        m_TensorInfo = biasInfo;
-        m_OutputSlot->SetTensorInfo(biasInfo);
-    }
-}
-
 ConstTensorPin::ConstTensorPin(bool optional)
     : m_Optional(optional)
 {}
 
-ConstTensorPin::ConstTensorPin(armnn::TensorInfo& tensorInfo,
+ConstTensorPin::ConstTensorPin(const armnn::TensorInfo& tensorInfo,
                                const void* valueStart,
                                uint32_t numBytes,
                                const armnn::PermutationVector& mappings)
-    : m_Optional(false)
 {
     armnn::IgnoreUnused(numBytes);
-    if (tensorInfo.GetNumBytes() != numBytes)
-    {
-        ALOGW("The size of ConstTensor does not match its TensorInfo.");
-    }
+    assert(tensorInfo.GetNumBytes() == numBytes);
 
     const bool needsSwizzling = (mappings.GetSize() > 0);
     if (needsSwizzling)
@@ -97,7 +70,7 @@ ConstTensorPin::ConstTensorPin(armnn::TensorInfo& tensorInfo,
         m_SwizzledTensorData.resize(tensorInfo.GetNumBytes());
         SwizzleAndroidNn4dTensorToArmNn(tensorInfo, valueStart, m_SwizzledTensorData.data(), mappings);
 
-        m_ConstTensor = armnn::ConstTensor(tensorInfo, m_SwizzledTensorData.data());
+        m_ConstTensor = armnn::ConstTensor(armnnUtils::Permuted(tensorInfo, mappings), m_SwizzledTensorData.data());
     }
     else
     {
@@ -139,11 +112,8 @@ armnn::IConnectableLayer* ProcessActivation(const armnn::TensorInfo& tensorInfo,
                                             armnn::IConnectableLayer* prevLayer,
                                             ConversionData& data)
 {
-    if (prevLayer->GetNumOutputSlots() != 1)
-    {
-        Fail("%s: Incorrect Number of OutputSlots expected 1 was %i", __func__, prevLayer->GetNumOutputSlots());
-        return nullptr;
-    }
+    ARMNN_ASSERT(prevLayer->GetNumOutputSlots() == 1);
+
     prevLayer->GetOutputSlot(0).SetTensorInfo(tensorInfo);
 
     armnn::IConnectableLayer* activationLayer = prevLayer;
@@ -191,12 +161,10 @@ armnn::IConnectableLayer* ProcessActivation(const armnn::TensorInfo& tensorInfo,
         }
 
         bool isSupported = false;
-        armnn::BackendId setBackend;
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsActivationSupported,
                                    data.m_Backends,
                                    isSupported,
-                                   setBackend,
                                    prevLayer->GetOutputSlot(0).GetTensorInfo(),
                                    tensorInfo,
                                    activationDesc);
@@ -206,7 +174,6 @@ armnn::IConnectableLayer* ProcessActivation(const armnn::TensorInfo& tensorInfo,
         }
 
         activationLayer = data.m_Network->AddActivationLayer(activationDesc);
-        activationLayer->SetBackendId(setBackend);
 
         prevLayer->GetOutputSlot(0).Connect(activationLayer->GetInputSlot(0));
         activationLayer->GetOutputSlot(0).SetTensorInfo(tensorInfo);
