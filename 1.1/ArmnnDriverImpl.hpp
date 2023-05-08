@@ -7,16 +7,15 @@
 
 #include <HalInterfaces.h>
 
+#include "NamespaceAdaptor.hpp"
 #include "../DriverOptions.hpp"
 
 #include <armnn/ArmNN.hpp>
 
-#ifdef ARMNN_ANDROID_R
+#if ARMNN_ANDROID_S
+using namespace android::nn;
+#elif ARMNN_ANDROID_R
 using namespace android::nn::hal;
-#endif
-
-#ifdef ARMNN_ANDROID_S
-using namespace android::hardware;
 #endif
 
 

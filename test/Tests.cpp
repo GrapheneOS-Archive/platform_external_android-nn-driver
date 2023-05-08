@@ -1,35 +1,31 @@
 //
-// Copyright © 2017 Arm Ltd and Contributors. All rights reserved.
+// Copyright © 2017 Arm Ltd. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
-
 #define LOG_TAG "ArmnnDriverTests"
+#define BOOST_TEST_MODULE armnn_driver_tests
+#include <boost/test/unit_test.hpp>
 #include <log/log.h>
 
-#ifndef DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#endif
-
 #include "DriverTestHelpers.hpp"
+
+BOOST_AUTO_TEST_SUITE(DriverTests)
 
 using namespace android::hardware;
 using namespace driverTestHelpers;
 using namespace armnn_driver;
 
-DOCTEST_TEST_SUITE("DriverTests")
-{
-
-DOCTEST_TEST_CASE("Init")
+BOOST_AUTO_TEST_CASE(Init)
 {
     // Making the driver object on the stack causes a weird libc error, so make it on the heap instead
     auto driver = std::make_unique<ArmnnDriver>(DriverOptions(armnn::Compute::CpuRef));
 
-    V1_0::DeviceStatus status = driver->getStatus();
-    // Note double-parentheses to avoid compile error from doctest trying to printf the DeviceStatus
-    DOCTEST_CHECK((status == V1_0::DeviceStatus::AVAILABLE));
+    DeviceStatus status = driver->getStatus();
+    // Note double-parentheses to avoid compile error from Boost trying to printf the DeviceStatus
+    BOOST_TEST((status == DeviceStatus::AVAILABLE));
 }
 
-DOCTEST_TEST_CASE("TestCapabilities")
+BOOST_AUTO_TEST_CASE(TestCapabilities)
 {
     // Making the driver object on the stack causes a weird libc error, so make it on the heap instead
     auto driver = std::make_unique<ArmnnDriver>(DriverOptions(armnn::Compute::CpuRef));
@@ -45,11 +41,11 @@ DOCTEST_TEST_CASE("TestCapabilities")
 
     driver->getCapabilities(cb);
 
-    DOCTEST_CHECK((int)error == (int)V1_0::ErrorStatus::NONE);
-    DOCTEST_CHECK(cap.float32Performance.execTime > 0.f);
-    DOCTEST_CHECK(cap.float32Performance.powerUsage > 0.f);
-    DOCTEST_CHECK(cap.quantized8Performance.execTime > 0.f);
-    DOCTEST_CHECK(cap.quantized8Performance.powerUsage > 0.f);
+    BOOST_TEST((int)error == (int)V1_0::ErrorStatus::NONE);
+    BOOST_TEST(cap.float32Performance.execTime > 0.f);
+    BOOST_TEST(cap.float32Performance.powerUsage > 0.f);
+    BOOST_TEST(cap.quantized8Performance.execTime > 0.f);
+    BOOST_TEST(cap.quantized8Performance.powerUsage > 0.f);
 }
 
-}
+BOOST_AUTO_TEST_SUITE_END()
