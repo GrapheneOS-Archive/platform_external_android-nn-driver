@@ -1,14 +1,15 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017-2021,2023 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
 #pragma once
 
 #include "../ConversionUtils.hpp"
-#include "NamespaceAdaptor.hpp"
 
 #include <HalInterfaces.h>
+
+namespace V1_0 = ::android::hardware::neuralnetworks::V1_0;
 
 namespace armnn_driver
 {
@@ -30,8 +31,6 @@ public:
     static bool ConvertOperation(const Operation& operation, const Model& model, ConversionData& data);
 
 private:
-    static bool ConvertAdd(const Operation& operation, const Model& model, ConversionData& data);
-
     static bool ConvertAveragePool2d(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertConcatenation(const Operation& operation, const Model& model, ConversionData& data);
@@ -43,6 +42,11 @@ private:
     static bool ConvertDepthwiseConv2d(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertDequantize(const Operation& operation, const Model& model, ConversionData& data);
+
+    static bool ConvertElementwiseBinary(const Operation& operation,
+                                         const Model& model,
+                                         ConversionData& data,
+                                         armnn::BinaryOperation binaryOperation);
 
     static bool ConvertFloor(const Operation& operation, const Model& model, ConversionData& data);
 
@@ -61,8 +65,6 @@ private:
     static bool ConvertL2Pool2d(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertMaxPool2d(const Operation& operation, const Model& model, ConversionData& data);
-
-    static bool ConvertMul(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertReLu(const Operation& operation, const Model& model, ConversionData& data);
 
