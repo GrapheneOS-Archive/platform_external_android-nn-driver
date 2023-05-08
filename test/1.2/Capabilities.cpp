@@ -1,15 +1,12 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
-#include "../../1.2/ArmnnDriverImpl.hpp"
-
+#include "../DriverTestHelpers.hpp"
 #include "Utils.h"
 
-#include <armnn/utility/Assert.hpp>
-
-#include <boost/test/unit_test.hpp>
+#include <1.2/ArmnnDriverImpl.hpp>
 
 #include <sys/system_properties.h>
 
@@ -61,16 +58,15 @@ struct CapabilitiesFixture
 void CheckOperandType(const V1_2::Capabilities& capabilities, V1_2::OperandType type, float execTime, float powerUsage)
 {
     using namespace armnn_driver::hal_1_2;
-    PerformanceInfo perfInfo = android::nn::lookup(capabilities.operandPerformance, type);
-    ARMNN_ASSERT(perfInfo.execTime == execTime);
-    ARMNN_ASSERT(perfInfo.powerUsage == powerUsage);
+    V1_0::PerformanceInfo perfInfo = android::nn::lookup(capabilities.operandPerformance, type);
+    DOCTEST_CHECK(perfInfo.execTime == execTime);
+    DOCTEST_CHECK(perfInfo.powerUsage == powerUsage);
 }
 
-BOOST_FIXTURE_TEST_SUITE(CapabilitiesTests, CapabilitiesFixture)
-
-BOOST_AUTO_TEST_CASE(PerformanceCapabilitiesWithRuntime)
+DOCTEST_TEST_SUITE("CapabilitiesTests")
 {
-    using namespace armnn_driver::hal_1_2;
+DOCTEST_TEST_CASE_FIXTURE(CapabilitiesFixture, "PerformanceCapabilitiesWithRuntime")
+{
     using namespace android::nn;
 
     auto getCapabilitiesFn = [&](V1_0::ErrorStatus error, const V1_2::Capabilities& capabilities)
@@ -94,7 +90,8 @@ BOOST_AUTO_TEST_CASE(PerformanceCapabilitiesWithRuntime)
             CheckOperandType(capabilities, V1_2::OperandType::OEM, FLT_MAX, FLT_MAX);
             CheckOperandType(capabilities, V1_2::OperandType::TENSOR_OEM_BYTE, FLT_MAX, FLT_MAX);
 
-            ARMNN_ASSERT(error == V1_0::ErrorStatus::NONE);
+            bool result = (error == V1_0::ErrorStatus::NONE);
+            DOCTEST_CHECK(result);
         };
 
     __system_property_set("Armnn.operandTypeTensorFloat32Performance.execTime", "2.0f");
@@ -121,12 +118,11 @@ BOOST_AUTO_TEST_CASE(PerformanceCapabilitiesWithRuntime)
     armnn::IRuntime::CreationOptions options;
     armnn::IRuntimePtr runtime(armnn::IRuntime::Create(options));
 
-    ArmnnDriverImpl::getCapabilities_1_2(runtime, getCapabilitiesFn);
+    armnn_driver::hal_1_2::ArmnnDriverImpl::getCapabilities_1_2(runtime, getCapabilitiesFn);
 }
 
-BOOST_AUTO_TEST_CASE(PerformanceCapabilitiesUndefined)
+DOCTEST_TEST_CASE_FIXTURE(CapabilitiesFixture, "PerformanceCapabilitiesUndefined")
 {
-    using namespace armnn_driver::hal_1_2;
     using namespace android::nn;
 
     float defaultValue = .1f;
@@ -155,13 +151,14 @@ BOOST_AUTO_TEST_CASE(PerformanceCapabilitiesUndefined)
             CheckOperandType(capabilities, V1_2::OperandType::OEM, FLT_MAX, FLT_MAX);
             CheckOperandType(capabilities, V1_2::OperandType::TENSOR_OEM_BYTE, FLT_MAX, FLT_MAX);
 
-            ARMNN_ASSERT(error == V1_0::ErrorStatus::NONE);
+            bool result = (error == V1_0::ErrorStatus::NONE);
+            DOCTEST_CHECK(result);
         };
 
     armnn::IRuntime::CreationOptions options;
     armnn::IRuntimePtr runtime(armnn::IRuntime::Create(options));
 
-    ArmnnDriverImpl::getCapabilities_1_2(runtime, getCapabilitiesFn);
+    armnn_driver::hal_1_2::ArmnnDriverImpl::getCapabilities_1_2(runtime, getCapabilitiesFn);
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+}
