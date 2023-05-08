@@ -1,5 +1,5 @@
 #
-# Copyright © 2017, 2022 ARM Ltd. All rights reserved.
+# Copyright © 2017 ARM Ltd. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 
@@ -8,16 +8,11 @@ LOCAL_PATH := $(call my-dir)
 # Configure these paths if you move the source or Khronos headers
 #
 OPENCL_HEADER_PATH := $(LOCAL_PATH)/../../mali/product/khronos/original
+NN_HEADER_PATH := $(LOCAL_PATH)/../../../../frameworks/ml/nn/runtime/include
 ARMNN_HEADER_PATH := $(LOCAL_PATH)/../armnn/include
-ARMNN_PROFILING_PATH := $(LOCAL_PATH)/../armnn/profiling
 ARMNN_THIRD_PARTY_PATH   := $(LOCAL_PATH)/../armnn/third-party
 ARMNN_UTILS_HEADER_PATH := $(LOCAL_PATH)/../armnn/src/armnnUtils
 ARMNN_DRIVER_HEADER_PATH := $(LOCAL_PATH)/..
-
-NN_HEADER_PATH := $(LOCAL_PATH)/../../../../frameworks/ml/nn/runtime/include
-ifeq ($(S_OR_LATER),1)
-NN_HEADER_PATH := $(LOCAL_PATH)/../../../../packages/modules/NeuralNetworks/runtime/include
-endif
 
 ##########################
 # armnn-driver-tests@1.0 #
@@ -43,7 +38,6 @@ LOCAL_C_INCLUDES := \
         $(OPENCL_HEADER_PATH) \
         $(NN_HEADER_PATH) \
         $(ARMNN_HEADER_PATH) \
-        $(ARMNN_PROFILING_PATH) \
         $(ARMNN_THIRD_PARTY_PATH) \
         $(ARMNN_UTILS_HEADER_PATH) \
         $(ARMNN_DRIVER_HEADER_PATH)
@@ -55,32 +49,16 @@ LOCAL_CFLAGS := \
         -O0 \
         -UNDEBUG
 
-# The variable to enable/disable the CL backend (ARMNN_COMPUTE_CL_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMCOMPUTECL_ENABLED
-endif # ARMNN_COMPUTE_CL_ENABLED == 1
-# The variable to enable/disable the NEON backend (ARMNN_COMPUTE_NEON_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_COMPUTE_NEON_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMCOMPUTENEON_ENABLED
-endif # ARMNN_COMPUTE_NEON_ENABLED == 1
-# The variable to enable/disable the REFERENCE backend (ARMNN_REF_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_REF_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMNNREF_ENABLED
-endif # ARMNN_REF_ENABLED == 1
-
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(ANDROID_R),1)
+ifeq ($(R_OR_LATER),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
 endif # R or later
 
-ifeq ($(ANDROID_S),1)
-LOCAL_CFLAGS+= \
-        -DARMNN_ANDROID_S
-endif # S or later
+ifeq ($(Q_OR_LATER),1)
+LOCAL_CFLAGS += \
+        -DBOOST_NO_AUTO_PTR
+endif # PLATFORM_VERSION == Q or later
 
 LOCAL_SRC_FILES := \
         1.0/Convolution2D.cpp \
@@ -94,14 +72,12 @@ LOCAL_SRC_FILES := \
         DriverTestHelpers.cpp \
         SystemProperties.cpp \
         Concat.cpp \
-        TestTensor.cpp \
-        TestHalfTensor.cpp
+        TestTensor.cpp
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        libflatbuffers-cpp \
-        arm_compute_library \
-        $(ARMNN_BACKEND_STATIC_LIBRARIES)
+        libboost_unit_test_framework \
+        arm_compute_library
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
         libarmnn-driver@1.0
@@ -175,7 +151,6 @@ LOCAL_C_INCLUDES := \
         $(OPENCL_HEADER_PATH) \
         $(NN_HEADER_PATH) \
         $(ARMNN_HEADER_PATH) \
-        $(ARMNN_PROFILING_PATH) \
         $(ARMNN_THIRD_PARTY_PATH) \
         $(ARMNN_UTILS_HEADER_PATH) \
         $(ARMNN_DRIVER_HEADER_PATH)
@@ -188,32 +163,16 @@ LOCAL_CFLAGS := \
         -UNDEBUG \
         -DARMNN_ANDROID_NN_V1_1
 
-# The variable to enable/disable the CL backend (ARMNN_COMPUTE_CL_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMCOMPUTECL_ENABLED
-endif # ARMNN_COMPUTE_CL_ENABLED == 1
-# The variable to enable/disable the NEON backend (ARMNN_COMPUTE_NEON_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_COMPUTE_NEON_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMCOMPUTENEON_ENABLED
-endif # ARMNN_COMPUTE_NEON_ENABLED == 1
-# The variable to enable/disable the REFERENCE backend (ARMNN_REF_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_REF_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMNNREF_ENABLED
-endif # ARMNN_REF_ENABLED == 1
-
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(ANDROID_R),1)
+ifeq ($(R_OR_LATER),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
 endif # R or later
 
-ifeq ($(ANDROID_S),1)
-LOCAL_CFLAGS+= \
-        -DARMNN_ANDROID_S
-endif # S or later
+ifeq ($(Q_OR_LATER),1)
+LOCAL_CFLAGS += \
+        -DBOOST_NO_AUTO_PTR
+endif # PLATFORM_VERSION == Q or later
 
 LOCAL_SRC_FILES := \
         1.0/Convolution2D.cpp \
@@ -230,14 +189,12 @@ LOCAL_SRC_FILES := \
         DriverTestHelpers.cpp \
         SystemProperties.cpp \
         Concat.cpp \
-        TestTensor.cpp \
-        TestHalfTensor.cpp
+        TestTensor.cpp
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        libflatbuffers-cpp \
-        arm_compute_library \
-        $(ARMNN_BACKEND_STATIC_LIBRARIES)
+        libboost_unit_test_framework \
+        arm_compute_library
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
         libarmnn-driver@1.1
@@ -303,7 +260,6 @@ LOCAL_C_INCLUDES := \
         $(OPENCL_HEADER_PATH) \
         $(NN_HEADER_PATH) \
         $(ARMNN_HEADER_PATH) \
-        $(ARMNN_PROFILING_PATH) \
         $(ARMNN_THIRD_PARTY_PATH) \
         $(ARMNN_UTILS_HEADER_PATH) \
         $(ARMNN_DRIVER_HEADER_PATH)
@@ -314,34 +270,14 @@ LOCAL_CFLAGS := \
         -Werror \
         -O0 \
         -UNDEBUG \
+        -DBOOST_NO_AUTO_PTR \
         -DARMNN_ANDROID_NN_V1_2
 
-# The variable to enable/disable the CL backend (ARMNN_COMPUTE_CL_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMCOMPUTECL_ENABLED
-endif # ARMNN_COMPUTE_CL_ENABLED == 1
-# The variable to enable/disable the NEON backend (ARMNN_COMPUTE_NEON_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_COMPUTE_NEON_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMCOMPUTENEON_ENABLED
-endif # ARMNN_COMPUTE_NEON_ENABLED == 1
-# The variable to enable/disable the REFERENCE backend (ARMNN_REF_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_REF_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMNNREF_ENABLED
-endif # ARMNN_REF_ENABLED == 1
-
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(ANDROID_R),1)
+ifeq ($(R_OR_LATER),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
 endif # R or later
-
-ifeq ($(ANDROID_S),1)
-LOCAL_CFLAGS+= \
-        -DARMNN_ANDROID_S
-endif # S or later
 
 LOCAL_SRC_FILES := \
         1.0/Convolution2D.cpp \
@@ -350,11 +286,9 @@ LOCAL_SRC_FILES := \
         1.1/Transpose.cpp \
         1.2/Dilation.cpp \
         1.2/Capabilities.cpp \
-        1.2/Mean.cpp \
         1.0/Lstm.cpp \
         1.1/Lstm.cpp \
         1.2/Lstm.cpp \
-        1.2/UnidirectionalSequenceLstm.cpp \
         Tests.cpp \
         UtilsTests.cpp \
         Concurrent.cpp \
@@ -363,14 +297,12 @@ LOCAL_SRC_FILES := \
         DriverTestHelpers.cpp \
         SystemProperties.cpp \
         Concat.cpp \
-        TestTensor.cpp \
-        TestHalfTensor.cpp
+        TestTensor.cpp
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        libflatbuffers-cpp \
-        arm_compute_library \
-        $(ARMNN_BACKEND_STATIC_LIBRARIES)
+        libboost_unit_test_framework \
+        arm_compute_library
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
         libarmnn-driver@1.2
@@ -432,7 +364,6 @@ LOCAL_C_INCLUDES := \
         $(OPENCL_HEADER_PATH) \
         $(NN_HEADER_PATH) \
         $(ARMNN_HEADER_PATH) \
-        $(ARMNN_PROFILING_PATH) \
         $(ARMNN_THIRD_PARTY_PATH) \
         $(ARMNN_UTILS_HEADER_PATH) \
         $(ARMNN_DRIVER_HEADER_PATH)
@@ -443,33 +374,9 @@ LOCAL_CFLAGS := \
         -Werror \
         -O0 \
         -UNDEBUG \
+        -DBOOST_NO_AUTO_PTR \
+        -DARMNN_ANDROID_R \
         -DARMNN_ANDROID_NN_V1_3
-
-# The variable to enable/disable the CL backend (ARMNN_COMPUTE_CL_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMCOMPUTECL_ENABLED
-endif # ARMNN_COMPUTE_CL_ENABLED == 1
-# The variable to enable/disable the NEON backend (ARMNN_COMPUTE_NEON_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_COMPUTE_NEON_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMCOMPUTENEON_ENABLED
-endif # ARMNN_COMPUTE_NEON_ENABLED == 1
-# The variable to enable/disable the REFERENCE backend (ARMNN_REF_ENABLED) is declared in android-nn-driver/Android.mk
-ifeq ($(ARMNN_REF_ENABLED),1)
-LOCAL_CFLAGS += \
-        -DARMNNREF_ENABLED
-endif # ARMNN_REF_ENABLED == 1
-
-ifeq ($(ANDROID_R),1)
-LOCAL_CFLAGS+= \
-        -DARMNN_ANDROID_R
-endif
-
-ifeq ($(ANDROID_S),1)
-LOCAL_CFLAGS+= \
-        -DARMNN_ANDROID_S
-endif
 
 LOCAL_SRC_FILES := \
         1.0/Convolution2D.cpp \
@@ -478,11 +385,9 @@ LOCAL_SRC_FILES := \
         1.1/Transpose.cpp \
         1.2/Dilation.cpp \
         1.2/Capabilities.cpp \
-        1.2/Mean.cpp \
         1.0/Lstm.cpp \
         1.1/Lstm.cpp \
         1.2/Lstm.cpp \
-        1.2/UnidirectionalSequenceLstm.cpp \
         1.3/QLstm.cpp \
         1.3/QosTests.cpp \
         Tests.cpp \
@@ -493,14 +398,12 @@ LOCAL_SRC_FILES := \
         DriverTestHelpers.cpp \
         SystemProperties.cpp \
         Concat.cpp \
-        TestTensor.cpp \
-        TestHalfTensor.cpp
+        TestTensor.cpp
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        libflatbuffers-cpp \
-        arm_compute_library \
-        $(ARMNN_BACKEND_STATIC_LIBRARIES)
+        libboost_unit_test_framework \
+        arm_compute_library
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
         libarmnn-driver@1.3
@@ -527,7 +430,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(ARMNN_INCLUDE_LIBOPENCL),1)
 LOCAL_SHARED_LIBRARIES+= \
-        libGLES_mali
+        libOpenCL
 endif
 
 include $(BUILD_EXECUTABLE)
