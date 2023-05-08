@@ -10,6 +10,7 @@
 #include "../ArmnnDevice.hpp"
 #include "ArmnnDriverImpl.hpp"
 #include "HalPolicy.hpp"
+#include "NamespaceAdaptor.hpp"
 
 #include "../ArmnnDriverImpl.hpp"
 

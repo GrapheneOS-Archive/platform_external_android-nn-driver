@@ -1,12 +1,15 @@
 //
-// Copyright © 2020 Arm Ltd and Contributors. All rights reserved.
+// Copyright © 2020 Arm Ltd. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
 #define LOG_TAG "ArmnnDriver"
 
-#include "ArmnnPreparedModel_1_3.hpp"
 #include "RequestThread_1_3.hpp"
+
+#include "ArmnnPreparedModel_1_3.hpp"
+
+#include <armnn/utility/Assert.hpp>
 
 #include <log/log.h>
 
@@ -175,7 +178,8 @@ void RequestThread_1_3<PreparedModel, HalVersion, CallbackContext>::Process()
 
             default:
                 // this should be unreachable
-                throw armnn::RuntimeException("ArmNN: RequestThread_1_3: invalid message type");
+                ALOGE("RequestThread_1_3::Process() - invalid message type");
+                ARMNN_ASSERT_MSG(false, "ArmNN: RequestThread_1_3: invalid message type");
         }
     }
 }

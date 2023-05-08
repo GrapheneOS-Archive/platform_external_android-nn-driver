@@ -1,5 +1,5 @@
 //
-// Copyright © 2017-2019,2023 Arm Ltd and Contributors. All rights reserved.
+// Copyright © 2017 Arm Ltd. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -80,9 +80,9 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
         switch (operation.type)
         {
             case V1_1::OperationType::DIV:
-                return ConvertElementwiseBinary(operation, model, data, armnn::BinaryOperation::Div);
+                return ConvertDiv(operation, model, data);
             case V1_1::OperationType::SUB:
-                return ConvertElementwiseBinary(operation, model, data, armnn::BinaryOperation::Sub);
+                return ConvertSub(operation, model, data);
             case V1_1::OperationType::MEAN:
                 return ConvertMean(operation, model, data);
             case V1_1::OperationType::PAD:
@@ -104,13 +104,16 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
     }
 }
 
-bool HalPolicy::ConvertElementwiseBinary(const Operation& operation,
-                                         const Model& model,
-                                         ConversionData& data,
-                                         armnn::BinaryOperation binaryOperation)
+bool HalPolicy::ConvertDiv(const Operation& operation, const Model& model, ConversionData& data)
 {
-    ALOGV("hal_1_1::HalPolicy::ConvertElementwiseBinary()");
-    return ::ConvertElementwiseBinary<hal_1_1::HalPolicy>(operation, model, data, binaryOperation);
+    ALOGV("hal_1_1::HalPolicy::ConvertDiv()");
+    return ::ConvertDiv<hal_1_1::HalPolicy>(operation, model, data);
+}
+
+bool HalPolicy::ConvertSub(const Operation& operation, const Model& model, ConversionData& data)
+{
+    ALOGV("hal_1_1::HalPolicy::ConvertSub()");
+    return ::ConvertSub<hal_1_1::HalPolicy>(operation, model, data);
 }
 
 bool HalPolicy::ConvertMean(const Operation& operation, const Model& model, ConversionData& data)
