@@ -8,18 +8,15 @@
 #include <HalInterfaces.h>
 
 #include "../DriverOptions.hpp"
+#include "../NamespaceAdaptor.hpp"
 
 #include <armnn/ArmNN.hpp>
 
-#ifdef ARMNN_ANDROID_R
+#if ARMNN_ANDROID_S
+using namespace android::nn;
+#elif ARMNN_ANDROID_R
 using namespace android::nn::hal;
 #endif
-
-#ifdef ARMNN_ANDROID_S
-using namespace android::hardware;
-#endif
-
-namespace V1_0 = ::android::hardware::neuralnetworks::V1_0;
 
 namespace armnn_driver
 {

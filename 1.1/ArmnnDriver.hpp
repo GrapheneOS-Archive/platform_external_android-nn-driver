@@ -14,6 +14,7 @@
 #include "../ArmnnDriverImpl.hpp"
 #include "../1.0/ArmnnDriverImpl.hpp"
 #include "../1.0/HalPolicy.hpp"
+#include "../NamespaceAdaptor.hpp"
 
 #include <log/log.h>
 
