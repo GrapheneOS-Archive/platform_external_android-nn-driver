@@ -1,5 +1,5 @@
 //
-// Copyright © 2020 Arm Ltd. All rights reserved.
+// Copyright © 2020,2022 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -131,10 +131,12 @@ bool ConvertFill(const HalOperation& operation, const HalModel& model, Conversio
     }
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                IsFillSupported,
                                data.m_Backends,
                                isSupported,
+                               setBackend,
                                inputInfo,
                                outputInfo,
                                descriptor);
@@ -144,10 +146,92 @@ bool ConvertFill(const HalOperation& operation, const HalModel& model, Conversio
     }
 
     IConnectableLayer* const layer = data.m_Network->AddFillLayer(descriptor);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the FillLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data);
+}
+
+template<typename HalPolicy,
+         typename HalOperation = typename HalPolicy::Operation,
+         typename HalModel     = typename HalPolicy::Model>
+bool ConvertLogicalBinary(const HalOperation& operation,
+                          const HalModel& model,
+                          ConversionData& data,
+                          LogicalBinaryOperation logicalOperation)
+{
+    using HalOperand = typename HalPolicy::Operand;
+
+    ALOGV("HalPolicy::ConvertLogicalBinary()");
+    ALOGV("logicalOperation = %s", GetLogicalBinaryOperationAsCString(logicalOperation));
+
+    LayerInputHandle input0 = ConvertToLayerInputHandle<HalPolicy>(operation, 0, model, data);
+    LayerInputHandle input1 = ConvertToLayerInputHandle<HalPolicy>(operation, 1, model, data);
+
+    if (!(input0.IsValid() && input1.IsValid()))
+    {
+        return Fail("%s: Operation has invalid inputs", __func__);
+    }
+
+    const HalOperand* output = GetOutputOperand<HalPolicy>(operation, 0, model);
+    if (!output)
+    {
+        return Fail("%s: Could not read output 0", __func__);
+    }
+
+    const TensorInfo& inputInfo0 = input0.GetTensorInfo();
+    const TensorInfo& inputInfo1 = input1.GetTensorInfo();
+    const TensorInfo& outputInfo = GetTensorInfoForOperand(*output);
+
+    LogicalBinaryDescriptor descriptor(logicalOperation);
+
+    bool isSupported = false;
+    armnn::BackendId setBackend;
+    auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
+    {
+        FORWARD_LAYER_SUPPORT_FUNC(__func__,
+                                   IsLogicalBinarySupported,
+                                   data.m_Backends,
+                                   isSupported,
+                                   setBackend,
+                                   inputInfo0,
+                                   inputInfo1,
+                                   outputInfo,
+                                   descriptor);
+    };
+
+    if(!IsDynamicTensor(outputInfo))
+    {
+        validateFunc(outputInfo, isSupported);
+    }
+    else
+    {
+        isSupported = AreDynamicTensorsSupported();
+    }
+
+    if (!isSupported)
+    {
+        return false;
+    }
+
+    IConnectableLayer* layer = data.m_Network->AddLogicalBinaryLayer(descriptor);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the LogicalBinaryLayer", __func__);
+    }
+
+    bool isReshapeSupported = BroadcastTensor(input0, input1, layer, data);
+    if (!isReshapeSupported)
+    {
+        return false;
+    }
+
+    return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
 }
 
 template<typename HalPolicy,
@@ -601,12 +685,14 @@ bool ConvertQuantizedLstm(const HalOperation& operation, const HalModel& model, 
 
     // Check if the layer is supported
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& cellStateOutInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsQLstmSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    outputStatePrevTimeStepInfo,
                                    cellStatePrevTimeStepInfo,
@@ -637,6 +723,7 @@ bool ConvertQuantizedLstm(const HalOperation& operation, const HalModel& model, 
 
     // Add the layer
     IConnectableLayer* layer = data.m_Network->AddQLstmLayer(desc, params, "QLstm");
+    layer->SetBackendId(setBackend);
 
     input.Connect(layer->GetInputSlot(0));
     outputStatePrevTimeStep.Connect(layer->GetInputSlot(1));
@@ -691,10 +778,12 @@ bool ConvertRank(const HalOperation& operation, const HalModel& model, Conversio
     }
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                IsRankSupported,
                                data.m_Backends,
                                isSupported,
+                               setBackend,
                                input.GetTensorInfo(),
                                outInfo);
     if (!isSupported)
@@ -703,7 +792,11 @@ bool ConvertRank(const HalOperation& operation, const HalModel& model, Conversio
     }
 
     armnn::IConnectableLayer* layer = data.m_Network->AddRankLayer();
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the RankLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, &outInfo);

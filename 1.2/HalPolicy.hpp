@@ -1,5 +1,5 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2019-2023 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -16,6 +16,7 @@ namespace V1_2 = ::android::hardware::neuralnetworks::V1_2;
 
 namespace armnn_driver
 {
+class DriverOptions;
 namespace hal_1_2
 {
 
@@ -31,12 +32,13 @@ public:
     using ExecutionCallback         = V1_2::IExecutionCallback;
     using getSupportedOperations_cb = V1_2::IDevice::getSupportedOperations_1_2_cb;
     using ErrorStatus               = V1_0::ErrorStatus;
+    using DeviceType                = V1_2::DeviceType;
+
+    static DeviceType GetDeviceTypeFromOptions(const DriverOptions& options);
 
     static bool ConvertOperation(const Operation& operation, const Model& model, ConversionData& data);
 
 private:
-    static bool ConvertAdd(const Operation& operation, const Model& model, ConversionData& data);
-
     static bool ConvertArgMinMax(const Operation& operation,
                                  const Model& model,
                                  ConversionData& data,
@@ -45,6 +47,10 @@ private:
     static bool ConvertAveragePool2d(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertBatchToSpaceNd(const Operation& operation, const Model& model, ConversionData& data);
+
+    static bool ConvertCast(const Operation& operation, const Model& model, ConversionData& data);
+
+    static bool ConvertChannelShuffle(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertComparison(const Operation& operation,
                                   const Model& model,
@@ -61,9 +67,12 @@ private:
 
     static bool ConvertDequantize(const Operation& operation, const Model& model, ConversionData& data);
 
-    static bool ConvertDiv(const Operation& operation, const Model& model, ConversionData& data);
-
     static bool ConvertExpandDims(const Operation& operation, const Model& model, ConversionData& data);
+
+    static bool ConvertElementwiseBinary(const Operation& operation,
+                                         const Model& model,
+                                         ConversionData& data,
+                                         armnn::BinaryOperation binaryOperation);
 
     static bool ConvertElementwiseUnary(const Operation& operation,
                                         const Model& model,
@@ -96,13 +105,7 @@ private:
 
     static bool ConvertMaxPool2d(const Operation& operation, const Model& model, ConversionData& data);
 
-    static bool ConvertMaximum(const Operation& operation, const Model& model, ConversionData& data);
-
     static bool ConvertMean(const Operation& operation, const Model& model, ConversionData& data);
-
-    static bool ConvertMinimum(const Operation& operation, const Model& model, ConversionData& data);
-
-    static bool ConvertMul(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertPad(const Operation& operation, const Model& model, ConversionData& data);
 
@@ -113,6 +116,11 @@ private:
     static bool ConvertQuantize(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertQuantized16BitLstm(const Operation& operation, const Model& model, ConversionData& data);
+
+    static bool ConvertReduce(const Operation& operation,
+                              const Model& model,
+                              ConversionData& data,
+                              ReduceOperation reduce_operation);
 
     static bool ConvertReLu(const Operation& operation, const Model& model, ConversionData& data);
 
@@ -139,13 +147,15 @@ private:
 
     static bool ConvertStridedSlice(const Operation& operation, const Model& model, ConversionData& data);
 
-    static bool ConvertSub(const Operation& operation, const Model& model, ConversionData& data);
-
     static bool ConvertTanH(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertTranspose(const Operation& operation, const Model& model, ConversionData& data);
 
     static bool ConvertTransposeConv2d(const Operation& operation, const Model& model, ConversionData& data);
+
+    static bool ConvertUnidirectionalSequenceLstm(const Operation& operation,
+                                                  const Model& model,
+                                                  ConversionData& data);
 };
 
 } // namespace hal_1_2

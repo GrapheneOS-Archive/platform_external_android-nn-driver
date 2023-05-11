@@ -1,5 +1,5 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -10,6 +10,10 @@
 
 #include <log/log.h>
 #include <type_traits>
+
+#ifdef ARMNN_ANDROID_S
+#include <LegacyUtils.h>
+#endif
 
 namespace armnn_driver
 {
@@ -31,7 +35,6 @@ ModelToINetworkConverter<HalPolicy>::ModelToINetworkConverter(const std::vector<
     {
         m_ConversionResult = ConversionResult::UnsupportedFeature;
         ALOGE("%s: Unexpected exception: %s", __func__, e.what());
-        assert(false);
     }
 }
 
@@ -46,12 +49,17 @@ void ModelToINetworkConverter<HalPolicy>::Convert()
 
     // map the memory pool into shared pointers
     m_Data.m_MemPools.clear();
+#if !defined(ARMNN_ANDROID_S)
     if (!setRunTimePoolInfosFromHidlMemories(&m_Data.m_MemPools, m_Model.pools))
+#else
+    if (!setRunTimePoolInfosFromCanonicalMemories(&m_Data.m_MemPools, uncheckedConvert(m_Model.pools)))
+#endif
     {
         Fail("%s: Setting of run time pool infos from Hidl Memories has failed.", __func__);
         m_ConversionResult = ConversionResult::ErrorMappingPools;
         return;
     }
+
 
     uint32_t totalPoolSize = 0;
     for (auto&& pool : m_Model.pools)
@@ -86,9 +94,9 @@ void ModelToINetworkConverter<HalPolicy>::Convert()
             ALOGV("ModelToINetworkConverter::Convert(): getMainModel(m_Model).operands[inputIndex];");
             const HalOperand& operand = getMainModel(m_Model).operands[inputIndex];
             ALOGV("ModelToINetworkConverter::Convert(): GetTensorInfoForOperand(operand)");
-            const armnn::TensorInfo& tensor = GetTensorInfoForOperand(operand);
-            ALOGV("ModelToINetworkConverter::Convert(): m_Data.m_Network->AddInputLayer(i)");
-            armnn::IConnectableLayer* layer = m_Data.m_Network->AddInputLayer(i);
+            const std::string layerName = "Input_" + std::to_string(i);
+            ALOGV("ModelToINetworkConverter::Convert(): m_Data.m_Network->AddInputLayer(i, layerName.c_str())");
+            armnn::IConnectableLayer* layer = m_Data.m_Network->AddInputLayer(i, layerName.c_str());
 
             ALOGV("ModelToINetworkConverter::Convert(): layer->GetOutputSlot(0)");
             armnn::IOutputSlot& outputSlot = layer->GetOutputSlot(0);
@@ -182,11 +190,15 @@ void ModelToINetworkConverter<HalPolicy>::Convert()
             {
                 // outputs in android nn are represented by operands
                 uint32_t outputIndex = getMainModel(m_Model).outputIndexes[i];
-                const HalOperand& operand = getMainModel(m_Model).operands[outputIndex];
-                const armnn::TensorInfo& tensor = GetTensorInfoForOperand(operand);
-                armnn::IConnectableLayer* layer = m_Data.m_Network->AddOutputLayer(i);
+                const std::string layerName = "Output_" + std::to_string(i);
+                armnn::IConnectableLayer* layer = m_Data.m_Network->AddOutputLayer(i, layerName.c_str());
 
-                assert(m_Data.m_OutputSlotForOperand[outputIndex]);
+                if (!m_Data.m_OutputSlotForOperand[outputIndex])
+                {
+                    Fail("%s: OutputSlot %i does not exist", __func__, outputIndex);
+                    m_ConversionResult = ConversionResult::UnsupportedFeature;
+                    break;
+                }
                 m_Data.m_OutputSlotForOperand[outputIndex]->Connect(layer->GetInputSlot(0));
             }
         }
@@ -202,7 +214,10 @@ template<typename HalPolicy>
 bool ModelToINetworkConverter<HalPolicy>::IsOperationSupported(uint32_t operationIndex) const
 {
     std::map<uint32_t, bool>::const_iterator it = m_OperationSupported.find(operationIndex);
-    assert(it != m_OperationSupported.end());
+    if (it == m_OperationSupported.end())
+    {
+        return Fail("%s: Unrecognised Operation Index: %i", __func__, operationIndex);
+    }
     return it->second;
 }
 

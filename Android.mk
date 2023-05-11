@@ -1,15 +1,91 @@
 #
-# Copyright © 2017 ARM Ltd. All rights reserved.
+# Copyright © 2022 ARM Ltd. and Contributors. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 
 ANDROID_NN_DRIVER_LOCAL_PATH := $(call my-dir)
 LOCAL_PATH := $(ANDROID_NN_DRIVER_LOCAL_PATH)
 
+P_OR_LATER := 0
+Q_OR_LATER := 0
+R_OR_LATER := 0
+S_OR_LATER := 0
+ANDROID_R  := 0
+ANDROID_S  := 0
+
+ifeq ($(PLATFORM_VERSION),9)
+P_OR_LATER := 1
+endif # PLATFORM_VERSION == 9
+ifeq ($(PLATFORM_VERSION),P)
+P_OR_LATER := 1
+endif # PLATFORM_VERSION == P
+
+ifeq ($(PLATFORM_VERSION),10)
+P_OR_LATER := 1
+Q_OR_LATER := 1
+endif # PLATFORM_VERSION == 10
+ifeq ($(PLATFORM_VERSION),Q)
+P_OR_LATER := 1
+Q_OR_LATER := 1
+endif # PLATFORM_VERSION == Q
+
+ifeq ($(PLATFORM_VERSION),R)
+P_OR_LATER := 1
+Q_OR_LATER := 1
+R_OR_LATER := 1
+ANDROID_R  := 1
+endif # PLATFORM_VERSION == R
+
+ifeq ($(PLATFORM_VERSION),11)
+P_OR_LATER := 1
+Q_OR_LATER := 1
+R_OR_LATER := 1
+ANDROID_R  := 1
+endif # PLATFORM_VERSION == 11
+
+ifeq ($(PLATFORM_VERSION),S)
 P_OR_LATER := 1
 Q_OR_LATER := 1
 R_OR_LATER := 1
 S_OR_LATER := 1
+ANDROID_R  := 0
+ANDROID_S  := 1
+endif # PLATFORM_VERSION == S
+
+ifeq ($(PLATFORM_VERSION),12)
+P_OR_LATER := 1
+Q_OR_LATER := 1
+R_OR_LATER := 1
+S_OR_LATER := 1
+ANDROID_R  := 0
+ANDROID_S  := 1
+endif # PLATFORM_VERSION == 12
+
+ifeq ($(PLATFORM_VERSION),T)
+P_OR_LATER := 1
+Q_OR_LATER := 1
+R_OR_LATER := 1
+S_OR_LATER := 1
+ANDROID_R  := 0
+ANDROID_S  := 1
+endif # PLATFORM_VERSION == S
+
+ifeq ($(PLATFORM_VERSION),13)
+P_OR_LATER := 1
+Q_OR_LATER := 1
+R_OR_LATER := 1
+S_OR_LATER := 1
+ANDROID_R  := 0
+ANDROID_S  := 1
+endif # PLATFORM_VERSION == 13
+
+# Override the flags to force Android S even though we are at U.
+P_OR_LATER := 1
+Q_OR_LATER := 1
+R_OR_LATER := 1
+S_OR_LATER := 1
+ANDROID_R  := 0
+ANDROID_S  := 1
 
 CPP_VERSION := c++14
 
@@ -18,20 +94,28 @@ CPP_VERSION := c++17
 endif
 
 # Configure these paths if you move the source or Khronos headers
+ARMNN_GENERATED_HEADER_PATH := $(LOCAL_PATH)/../armnn/generated
+ARMNN_PROFILING_HEADER_PATH := $(LOCAL_PATH)/../armnn/profiling
+ARMNN_COMMON_PROFILING_HEADER_PATH := $(LOCAL_PATH)/../armnn/profiling/common/include
+ARMNN_CLIENT_PROFILING_HEADER_PATH := $(LOCAL_PATH)/../armnn/profiling/client/include
 ARMNN_HEADER_PATH := $(LOCAL_PATH)/../armnn/include
+ARMNN_BACKEND_MAKEFILE_LOCAL_PATHS := $(wildcard $(LOCAL_PATH)/../armnn/src/backends/*/backend.mk)
+ARMNN_BACKEND_MAKEFILE_PATHS := $(subst $(LOCAL_PATH),,$(ARMNN_BACKEND_MAKEFILE_LOCAL_PATHS))
+ARMNN_BACKEND_MAKEFILE_DIRS := $(subst /backend.mk,,$(ARMNN_BACKEND_MAKEFILE_PATHS))
 ARMNN_THIRD_PARTY_PATH := $(LOCAL_PATH)/../armnn/third-party
 ARMNN_UTILS_HEADER_PATH := $(LOCAL_PATH)/../armnn/src/armnnUtils
-ARMNN_THIRD_PARTY_PATH := $(LOCAL_PATH)/../armnn/third-party
 OPENCL_HEADER_PATH := $(LOCAL_PATH)/clframework/include
-NN_HEADER_PATH := $(LOCAL_PATH)/../../packages/modules/NeuralNetworks/common/include \
-                  $(LOCAL_PATH)/../../packages/modules/NeuralNetworks/runtime/include
+NN_HEADER_PATH := $(LOCAL_PATH)/../../../frameworks/ml/nn/runtime/include
+ifeq ($(S_OR_LATER),1)
+NN_HEADER_PATH := $(LOCAL_PATH)/../../packages/modules/NeuralNetworks/runtime/include
+endif
 
 # Variables to control CL/NEON/reference backend support
 # Set them to '0' to disable support for a specific backend
 ARMNN_COMPUTE_CL_ENABLED := 0
 ARMNN_COMPUTE_NEON_ENABLED := 0
 ARMNN_REF_ENABLED := 1
-ARMNN_ETHOSN_ENABLED := 1
+ARMNN_ETHOSN_ENABLED := 0
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLE),1)
 ARMNN_COMPUTE_CL_ENABLED := 1
@@ -45,8 +129,8 @@ ifeq ($(ARMNN_REF_ENABLE),0)
 ARMNN_REF_ENABLED := 0
 endif
 
-ifeq ($(ARMNN_ETHOSN_ENABLE),0)
-ARMNN_ETHOSN_ENABLED := 0
+ifeq ($(ARMNN_ETHOSN_ENABLE),1)
+ARMNN_ETHOSN_ENABLED := 1
 endif
 
 # Variable to control inclusion of libOpenCL shared library
@@ -57,6 +141,31 @@ endif
 
 # Variable to control retire rate of priority queue
 RETIRE_RATE := 3
+
+# Placeholder to hold all backend link files.
+ARMNN_BACKEND_STATIC_LIBRARIES :=
+ARMNN_BACKEND_SHARED_LIBRARIES :=
+
+ifeq ($(TARGET_ARCH),arm)
+ARMNN_BACKEND_STATIC_LIBRARIES += arm_compute_library
+endif
+ifeq ($(TARGET_ARCH),arm64)
+ARMNN_BACKEND_STATIC_LIBRARIES += arm_compute_library
+endif
+
+# Iterate through the Arm NN backends and specific include paths, include them into the
+# current makefile and append the linkfiles held by
+# the optional BACKEND_STATIC_LIBRARIES and optional BACKEND_SHARED_LIBRARIES variable
+# (included from the given makefile) to
+# the ARMNN_BACKEND_STATIC_LIBRARIES and ARMNN_BACKEND_SHARED_LIBRARIES lists
+
+$(foreach mkPath,$(ARMNN_BACKEND_MAKEFILE_DIRS),\
+        $(eval include $(LOCAL_PATH)/$(mkPath)/backend.mk)\
+        $(eval ARMNN_BACKEND_STATIC_LIBRARIES += $(BACKEND_STATIC_LIBRARIES)))
+
+$(foreach mkPath,$(ARMNN_BACKEND_MAKEFILE_DIRS),\
+        $(eval include $(LOCAL_PATH)/$(mkPath)/backend.mk)\
+        $(eval ARMNN_BACKEND_SHARED_LIBRARIES += $(BACKEND_SHARED_LIBRARIES)))
 
 #######################
 # libarmnn-driver@1.0 #
@@ -79,10 +188,13 @@ LOCAL_PROPRIETARY_MODULE := true
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_C_INCLUDES := \
+        $(ARMNN_GENERATED_HEADER_PATH) \
+        $(ARMNN_THIRD_PARTY_PATH) \
+        $(ARMNN_PROFILING_HEADER_PATH) \
+        $(ARMNN_COMMON_PROFILING_HEADER_PATH) \
+        $(ARMNN_CLIENT_PROFILING_HEADER_PATH) \
         $(ARMNN_HEADER_PATH) \
-        $(ARMNN_THIRD_PARTY_PATH) \
         $(ARMNN_UTILS_HEADER_PATH) \
-        $(ARMNN_THIRD_PARTY_PATH) \
         $(OPENCL_HEADER_PATH) \
         $(NN_HEADER_PATH)
 
@@ -93,11 +205,12 @@ LOCAL_CFLAGS := \
         -Wno-format-security
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(R_OR_LATER),1)
+ifeq ($(ANDROID_R),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
 endif
-ifeq ($(S_OR_LATER),1)
+
+ifeq ($(ANDROID_S),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_S
 endif
@@ -105,6 +218,8 @@ endif
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS+= \
         -UNDEBUG
+LOCAL_LDFLAGS += \
+        -Wl,-Map=libarmnndriver10MapFile.map
 endif # ARMNN_DRIVER_DEBUG == 1
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
@@ -141,7 +256,8 @@ LOCAL_SRC_FILES := \
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        arm_compute_library
+        libflatbuffers-cpp \
+        $(ARMNN_BACKEND_STATIC_LIBRARIES)
 
 LOCAL_WHOLE_STATIC_LIBRARIES := libarmnn
 
@@ -213,10 +329,13 @@ LOCAL_PROPRIETARY_MODULE := true
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_C_INCLUDES := \
+        $(ARMNN_GENERATED_HEADER_PATH) \
+        $(ARMNN_THIRD_PARTY_PATH) \
+        $(ARMNN_PROFILING_HEADER_PATH) \
+        $(ARMNN_COMMON_PROFILING_HEADER_PATH) \
+        $(ARMNN_CLIENT_PROFILING_HEADER_PATH) \
         $(ARMNN_HEADER_PATH) \
-        $(ARMNN_THIRD_PARTY_PATH) \
         $(ARMNN_UTILS_HEADER_PATH) \
-        $(ARMNN_THIRD_PARTY_PATH) \
         $(OPENCL_HEADER_PATH) \
         $(NN_HEADER_PATH)
 
@@ -224,20 +343,26 @@ LOCAL_CFLAGS := \
         -std=$(CPP_VERSION) \
         -fexceptions \
         -Werror \
+        -Wall \
+        -Wextra \
+        -Wno-unused-function \
         -Wno-format-security \
         -DARMNN_ANDROID_NN_V1_1
 
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS+= \
         -UNDEBUG
+LOCAL_LDFLAGS += \
+        -Wl,-Map=libarmnnDriver11MapFile.map
 endif # ARMNN_DRIVER_DEBUG == 1
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(R_OR_LATER),1)
+ifeq ($(ANDROID_R),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
 endif
-ifeq ($(S_OR_LATER),1)
+
+ifeq ($(ANDROID_S),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_S
 endif
@@ -278,7 +403,8 @@ LOCAL_SRC_FILES := \
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        arm_compute_library
+        libflatbuffers-cpp \
+        $(ARMNN_BACKEND_STATIC_LIBRARIES)
 
 LOCAL_WHOLE_STATIC_LIBRARIES := libarmnn
 
@@ -340,10 +466,13 @@ LOCAL_PROPRIETARY_MODULE := true
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_C_INCLUDES := \
+        $(ARMNN_GENERATED_HEADER_PATH) \
+        $(ARMNN_THIRD_PARTY_PATH) \
+        $(ARMNN_PROFILING_HEADER_PATH) \
+        $(ARMNN_COMMON_PROFILING_HEADER_PATH) \
+        $(ARMNN_CLIENT_PROFILING_HEADER_PATH) \
         $(ARMNN_HEADER_PATH) \
-        $(ARMNN_THIRD_PARTY_PATH) \
         $(ARMNN_UTILS_HEADER_PATH) \
-        $(ARMNN_THIRD_PARTY_PATH) \
         $(OPENCL_HEADER_PATH) \
         $(NN_HEADER_PATH)
 
@@ -351,20 +480,26 @@ LOCAL_CFLAGS := \
         -std=$(CPP_VERSION) \
         -fexceptions \
         -Werror \
+        -Wall \
+        -Wextra \
+        -Wno-unused-function \
         -Wno-format-security \
         -DARMNN_ANDROID_NN_V1_2
 
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS+= \
         -UNDEBUG
+LOCAL_LDFLAGS += \
+        -Wl,-Map=libarmnnDriver12MapFile.map
 endif # ARMNN_DRIVER_DEBUG == 1
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(R_OR_LATER),1)
+ifeq ($(ANDROID_R),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
 endif
-ifeq ($(S_OR_LATER),1)
+
+ifeq ($(ANDROID_S),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_S
 endif
@@ -400,6 +535,7 @@ LOCAL_SRC_FILES := \
         ArmnnDriverImpl.cpp \
         ArmnnPreparedModel.cpp \
         ArmnnPreparedModel_1_2.cpp \
+        CacheDataHandler.cpp \
         ConversionUtils.cpp \
         DriverOptions.cpp \
         ModelToINetworkConverter.cpp \
@@ -408,7 +544,8 @@ LOCAL_SRC_FILES := \
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        arm_compute_library
+        libflatbuffers-cpp \
+        $(ARMNN_BACKEND_STATIC_LIBRARIES)
 
 LOCAL_WHOLE_STATIC_LIBRARIES := libarmnn
 
@@ -466,10 +603,13 @@ LOCAL_PROPRIETARY_MODULE := true
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_C_INCLUDES := \
+        $(ARMNN_GENERATED_HEADER_PATH) \
+        $(ARMNN_THIRD_PARTY_PATH) \
+        $(ARMNN_PROFILING_HEADER_PATH) \
+        $(ARMNN_COMMON_PROFILING_HEADER_PATH) \
+        $(ARMNN_CLIENT_PROFILING_HEADER_PATH) \
         $(ARMNN_HEADER_PATH) \
-        $(ARMNN_THIRD_PARTY_PATH) \
         $(ARMNN_UTILS_HEADER_PATH) \
-        $(ARMNN_THIRD_PARTY_PATH) \
         $(OPENCL_HEADER_PATH) \
         $(NN_HEADER_PATH)
 
@@ -477,14 +617,27 @@ LOCAL_CFLAGS := \
         -std=$(CPP_VERSION) \
         -fexceptions \
         -Werror \
+        -Wall \
+        -Wextra \
+        -Wno-unused-function \
         -Wno-format-security \
         -DARMNN_ANDROID_NN_V1_3 \
-        -DARMNN_ANDROID_R \
+
+ifeq ($(ANDROID_R),1)
+LOCAL_CFLAGS+= \
+        -DARMNN_ANDROID_R
+endif
+
+ifeq ($(ANDROID_S),1)
+LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_S
+endif
 
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS+= \
         -UNDEBUG
+LOCAL_LDFLAGS += \
+        -Wl,-Map=libarmnnDriver13MapFile.map
 endif # ARMNN_DRIVER_DEBUG == 1
 
 ifeq ($(ARMNN_COMPUTE_CL_ENABLED),1)
@@ -524,6 +677,7 @@ LOCAL_SRC_FILES := \
         ArmnnPreparedModel.cpp \
         ArmnnPreparedModel_1_2.cpp \
         ArmnnPreparedModel_1_3.cpp \
+        CacheDataHandler.cpp \
         ConversionUtils.cpp \
         DriverOptions.cpp \
         ModelToINetworkConverter.cpp \
@@ -533,7 +687,8 @@ LOCAL_SRC_FILES := \
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        arm_compute_library
+        libflatbuffers-cpp \
+        $(ARMNN_BACKEND_STATIC_LIBRARIES)
 
 LOCAL_WHOLE_STATIC_LIBRARIES := libarmnn
 
@@ -591,8 +746,12 @@ LOCAL_PROPRIETARY_MODULE := true
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_C_INCLUDES := \
-        $(ARMNN_HEADER_PATH) \
+        $(ARMNN_GENERATED_HEADER_PATH) \
         $(ARMNN_THIRD_PARTY_PATH) \
+        $(ARMNN_PROFILING_HEADER_PATH) \
+        $(ARMNN_COMMON_PROFILING_HEADER_PATH) \
+        $(ARMNN_CLIENT_PROFILING_HEADER_PATH) \
+        $(ARMNN_HEADER_PATH) \
         $(NN_HEADER_PATH)
 
 LOCAL_CFLAGS := \
@@ -602,15 +761,17 @@ LOCAL_CFLAGS := \
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS += \
         -UNDEBUG
+LOCAL_LDFLAGS += \
+        -Wl,-Map=neuralNetworks10MapFile.map
 endif # ARMNN_DRIVER_DEBUG == 1
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(R_OR_LATER),1)
+ifeq ($(ANDROID_R),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
 endif
 
-ifeq ($(S_OR_LATER),1)
+ifeq ($(ANDROID_S),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_S
 endif
@@ -620,7 +781,8 @@ LOCAL_SRC_FILES := \
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        arm_compute_library
+        libflatbuffers-cpp \
+        $(ARMNN_BACKEND_STATIC_LIBRARIES)
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
         libarmnn-driver@1.0
@@ -637,7 +799,8 @@ LOCAL_SHARED_LIBRARIES := \
         libutils \
         android.hardware.neuralnetworks@1.0 \
         android.hidl.allocator@1.0 \
-        android.hidl.memory@1.0
+        android.hidl.memory@1.0 \
+        $(ARMNN_BACKEND_SHARED_LIBRARIES)
 
 ifeq ($(P_OR_LATER),1)
 # Required to build the 1.0 version of the NN Driver on Android P and later versions,
@@ -700,8 +863,12 @@ LOCAL_PROPRIETARY_MODULE := true
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_C_INCLUDES := \
-        $(ARMNN_HEADER_PATH) \
+        $(ARMNN_GENERATED_HEADER_PATH) \
         $(ARMNN_THIRD_PARTY_PATH) \
+        $(ARMNN_PROFILING_HEADER_PATH) \
+        $(ARMNN_COMMON_PROFILING_HEADER_PATH) \
+        $(ARMNN_CLIENT_PROFILING_HEADER_PATH) \
+        $(ARMNN_HEADER_PATH) \
         $(NN_HEADER_PATH)
 
 LOCAL_CFLAGS := \
@@ -712,15 +879,17 @@ LOCAL_CFLAGS := \
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS += \
         -UNDEBUG
+LOCAL_LDFLAGS += \
+        -Wl,-Map=neuralNetworks11MapFile.map
 endif # ARMNN_DRIVER_DEBUG == 1
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(R_OR_LATER),1)
+ifeq ($(ANDROID_R),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
 endif
 
-ifeq ($(S_OR_LATER),1)
+ifeq ($(ANDROID_S),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_S
 endif
@@ -730,7 +899,8 @@ LOCAL_SRC_FILES := \
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        arm_compute_library
+        libflatbuffers-cpp \
+        $(ARMNN_BACKEND_STATIC_LIBRARIES)
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
         libarmnn-driver@1.1
@@ -748,7 +918,8 @@ LOCAL_SHARED_LIBRARIES := \
         android.hardware.neuralnetworks@1.0 \
         android.hardware.neuralnetworks@1.1 \
         android.hidl.allocator@1.0 \
-        android.hidl.memory@1.0
+        android.hidl.memory@1.0 \
+        $(ARMNN_BACKEND_SHARED_LIBRARIES)
 
 ifeq ($(Q_OR_LATER),1)
 LOCAL_SHARED_LIBRARIES+= \
@@ -802,8 +973,12 @@ LOCAL_PROPRIETARY_MODULE := true
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_C_INCLUDES := \
-        $(ARMNN_HEADER_PATH) \
+        $(ARMNN_GENERATED_HEADER_PATH) \
         $(ARMNN_THIRD_PARTY_PATH) \
+        $(ARMNN_PROFILING_HEADER_PATH) \
+        $(ARMNN_COMMON_PROFILING_HEADER_PATH) \
+        $(ARMNN_CLIENT_PROFILING_HEADER_PATH) \
+        $(ARMNN_HEADER_PATH) \
         $(NN_HEADER_PATH)
 
 LOCAL_CFLAGS := \
@@ -818,15 +993,17 @@ LOCAL_CFLAGS := \
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS += \
         -UNDEBUG
+LOCAL_LDFLAGS += \
+        -Wl,-Map=neuralNetworks12MapFile.map
 endif # ARMNN_DRIVER_DEBUG == 1
 
 # Required to build with the changes made to the Android ML framework specific to Android R
-ifeq ($(R_OR_LATER),1)
+ifeq ($(ANDROID_R),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_R
 endif
 
-ifeq ($(S_OR_LATER),1)
+ifeq ($(ANDROID_S),1)
 LOCAL_CFLAGS+= \
         -DARMNN_ANDROID_S
 endif
@@ -836,7 +1013,8 @@ LOCAL_SRC_FILES := \
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        arm_compute_library
+        libflatbuffers-cpp \
+        $(ARMNN_BACKEND_STATIC_LIBRARIES)
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
         libarmnn-driver@1.2
@@ -860,7 +1038,7 @@ LOCAL_SHARED_LIBRARIES := \
         android.hardware.neuralnetworks@1.0 \
         android.hardware.neuralnetworks@1.1 \
         android.hardware.neuralnetworks@1.2 \
-        android.hardware.neuralnetworks@1.3
+        $(ARMNN_BACKEND_SHARED_LIBRARIES)
 
 ifeq ($(R_OR_LATER),1)
 LOCAL_SHARED_LIBRARIES+= \
@@ -905,24 +1083,34 @@ LOCAL_PROPRIETARY_MODULE := true
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
 LOCAL_C_INCLUDES := \
-        $(ARMNN_HEADER_PATH) \
+        $(ARMNN_GENERATED_HEADER_PATH) \
         $(ARMNN_THIRD_PARTY_PATH) \
+        $(ARMNN_PROFILING_HEADER_PATH) \
+        $(ARMNN_COMMON_PROFILING_HEADER_PATH) \
+        $(ARMNN_CLIENT_PROFILING_HEADER_PATH) \
+        $(ARMNN_HEADER_PATH) \
         $(NN_HEADER_PATH)
 
 LOCAL_CFLAGS := \
         -std=$(CPP_VERSION) \
         -fexceptions \
         -DARMNN_ANDROID_NN_V1_3 \
-        -DARMNN_ANDROID_R \
-        -DARMNN_ANDROID_S \
-        -Wno-unused-variable \
-        -Wno-unneeded-internal-declaration \
-        -Wno-unused-function \
-        -Wno-unused-local-typedef
+
+ifeq ($(ANDROID_R),1)
+LOCAL_CFLAGS+= \
+        -DARMNN_ANDROID_R
+endif
+
+ifeq ($(ANDROID_S),1)
+LOCAL_CFLAGS+= \
+        -DARMNN_ANDROID_S
+endif
 
 ifeq ($(ARMNN_DRIVER_DEBUG),1)
 LOCAL_CFLAGS += \
         -UNDEBUG
+LOCAL_LDFLAGS += \
+        -Wl,-Map=neuralNetworks13MapFile.map
 endif # ARMNN_DRIVER_DEBUG == 1
 
 LOCAL_SRC_FILES := \
@@ -930,7 +1118,8 @@ LOCAL_SRC_FILES := \
 
 LOCAL_STATIC_LIBRARIES := \
         libneuralnetworks_common \
-        arm_compute_library
+        libflatbuffers-cpp \
+        $(ARMNN_BACKEND_STATIC_LIBRARIES)
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
         libarmnn-driver@1.3
@@ -955,7 +1144,8 @@ LOCAL_SHARED_LIBRARIES := \
         android.hardware.neuralnetworks@1.0 \
         android.hardware.neuralnetworks@1.1 \
         android.hardware.neuralnetworks@1.2 \
-        android.hardware.neuralnetworks@1.3
+        android.hardware.neuralnetworks@1.3 \
+        $(ARMNN_BACKEND_SHARED_LIBRARIES)
 
 ifeq ($(ARMNN_INCLUDE_LIBOPENCL),1)
 ifeq (,$(realpath $(TOPDIR)vendor/arm/mali/valhall/Android.bp))
