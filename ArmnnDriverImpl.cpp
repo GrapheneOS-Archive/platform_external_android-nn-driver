@@ -1,5 +1,5 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017, 2023 Arm Ltd. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -23,6 +23,7 @@
 
 #include <ValidateHal.h>
 #include <log/log.h>
+#include <chrono>
 
 using namespace std;
 using namespace android;
@@ -70,6 +71,8 @@ Return<V1_0::ErrorStatus> ArmnnDriverImpl<HalPolicy>::prepareModel(
 {
     ALOGV("ArmnnDriverImpl::prepareModel()");
 
+    std::chrono::time_point<std::chrono::system_clock> prepareModelTimepoint = std::chrono::system_clock::now();
+
     if (cb.get() == nullptr)
     {
         ALOGW("ArmnnDriverImpl::prepareModel: Invalid callback passed to prepareModel");
@@ -100,21 +103,36 @@ Return<V1_0::ErrorStatus> ArmnnDriverImpl<HalPolicy>::prepareModel(
         return V1_0::ErrorStatus::NONE;
     }
 
+    // Serialize the network graph to a .armnn file if an output directory
+    // has been specified in the drivers' arguments.
+    std::vector<uint8_t> dataCacheData;
+    auto serializedNetworkFileName =
+        SerializeNetwork(*modelConverter.GetINetwork(),
+                         options.GetRequestInputsAndOutputsDumpDir(),
+                         dataCacheData,
+                         false);
+
     // Optimize the network
     armnn::IOptimizedNetworkPtr optNet(nullptr, nullptr);
-    armnn::OptimizerOptions OptOptions;
-    OptOptions.m_ReduceFp32ToFp16 = float32ToFloat16;
+    armnn::OptimizerOptionsOpaque OptOptions;
+    OptOptions.SetReduceFp32ToFp16(float32ToFloat16);
 
     armnn::BackendOptions gpuAcc("GpuAcc",
     {
-        { "FastMathEnabled", options.IsFastMathEnabled() }
+        { "FastMathEnabled", options.IsFastMathEnabled() },
+        { "SaveCachedNetwork", options.SaveCachedNetwork() },
+        { "CachedNetworkFilePath", options.GetCachedNetworkFilePath() },
+        { "MLGOTuningFilePath", options.GetClMLGOTunedParametersFile() }
+
     });
+
     armnn::BackendOptions cpuAcc("CpuAcc",
     {
-        { "FastMathEnabled", options.IsFastMathEnabled() }
+        { "FastMathEnabled", options.IsFastMathEnabled() },
+        { "NumberOfThreads", options.GetNumberOfThreads() }
     });
-    OptOptions.m_ModelOptions.push_back(gpuAcc);
-    OptOptions.m_ModelOptions.push_back(cpuAcc);
+    OptOptions.AddModelOption(gpuAcc);
+    OptOptions.AddModelOption(cpuAcc);
 
     std::vector<std::string> errMessages;
     try
@@ -152,9 +170,14 @@ Return<V1_0::ErrorStatus> ArmnnDriverImpl<HalPolicy>::prepareModel(
 
     // Load it into the runtime.
     armnn::NetworkId netId = 0;
+    std::string msg;
+    armnn::INetworkProperties networkProperties(options.isAsyncModelExecutionEnabled(),
+                                                armnn::MemorySource::Undefined,
+                                                armnn::MemorySource::Undefined);
+
     try
     {
-        if (runtime->LoadNetwork(netId, move(optNet)) != armnn::Status::Success)
+        if (runtime->LoadNetwork(netId, move(optNet), msg, networkProperties) != armnn::Status::Success)
         {
             return FailPrepareModel(V1_0::ErrorStatus::GENERAL_FAILURE, "Network could not be loaded", cb);
         }
@@ -167,11 +190,12 @@ Return<V1_0::ErrorStatus> ArmnnDriverImpl<HalPolicy>::prepareModel(
         return V1_0::ErrorStatus::NONE;
     }
 
-    // Now that we have a networkId for the graph rename the dump file to use it
-    // so that we can associate the graph file and the input/output tensor dump files
-    RenameGraphDotFile(dotGraphFileName,
-                       options.GetRequestInputsAndOutputsDumpDir(),
-                       netId);
+    // Now that we have a networkId for the graph rename the exported files to use it
+    // so that we can associate the graph file and the input/output tensor exported files
+    RenameExportedFiles(serializedNetworkFileName,
+                        dotGraphFileName,
+                        options.GetRequestInputsAndOutputsDumpDir(),
+                        netId);
 
     sp<ArmnnPreparedModel<HalPolicy>> preparedModel(
             new ArmnnPreparedModel<HalPolicy>(
@@ -179,31 +203,42 @@ Return<V1_0::ErrorStatus> ArmnnDriverImpl<HalPolicy>::prepareModel(
                     runtime.get(),
                     model,
                     options.GetRequestInputsAndOutputsDumpDir(),
-                    options.IsGpuProfilingEnabled()));
+                    options.IsGpuProfilingEnabled(),
+                    options.isAsyncModelExecutionEnabled(),
+                    options.getNoOfArmnnThreads(),
+                    options.isImportEnabled(),
+                    options.isExportEnabled()));
 
-    // Run a single 'dummy' inference of the model. This means that CL kernels will get compiled (and tuned if
-    // this is enabled) before the first 'real' inference which removes the overhead of the first inference.
-    if (!preparedModel->ExecuteWithDummyInputs())
+    if (std::find(options.GetBackends().begin(),
+                  options.GetBackends().end(),
+                  armnn::Compute::GpuAcc) != options.GetBackends().end())
     {
-        return FailPrepareModel(V1_0::ErrorStatus::GENERAL_FAILURE, "Network could not be executed", cb);
-    }
-
-    if (clTunedParameters &&
-        options.GetClTunedParametersMode() == armnn::IGpuAccTunedParameters::Mode::UpdateTunedParameters)
-    {
-        // Now that we've done one inference the CL kernel parameters will have been tuned, so save the updated file.
-        try
+        // Run a single 'dummy' inference of the model. This means that CL kernels will get compiled (and tuned if
+        // this is enabled) before the first 'real' inference which removes the overhead of the first inference.
+        if (!preparedModel->ExecuteWithDummyInputs())
         {
-            clTunedParameters->Save(options.GetClTunedParametersFile().c_str());
+            return FailPrepareModel(V1_0::ErrorStatus::GENERAL_FAILURE, "Network could not be executed", cb);
         }
-        catch (std::exception& error)
+
+        if (clTunedParameters &&
+            options.GetClTunedParametersMode() == armnn::IGpuAccTunedParameters::Mode::UpdateTunedParameters)
         {
-            ALOGE("ArmnnDriverImpl::prepareModel: Failed to save CL tuned parameters file '%s': %s",
-                  options.GetClTunedParametersFile().c_str(), error.what());
+            // Now that we've done one inference the CL kernel parameters will have been tuned, so save the updated file
+            try
+            {
+                clTunedParameters->Save(options.GetClTunedParametersFile().c_str());
+            }
+            catch (std::exception& error)
+            {
+                ALOGE("ArmnnDriverImpl::prepareModel: Failed to save CL tuned parameters file '%s': %s",
+                      options.GetClTunedParametersFile().c_str(), error.what());
+            }
         }
     }
-
     NotifyCallbackAndCheck(cb, V1_0::ErrorStatus::NONE, preparedModel);
+
+    ALOGV("ArmnnDriverImpl::prepareModel cache timing = %lld µs", std::chrono::duration_cast<std::chrono::microseconds>
+         (std::chrono::system_clock::now() - prepareModelTimepoint).count());
 
     return V1_0::ErrorStatus::NONE;
 }
