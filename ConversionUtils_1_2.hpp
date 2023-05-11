@@ -1,5 +1,5 @@
 //
-// Copyright © 2020 Arm Ltd and Contributors. All rights reserved.
+// Copyright © 2020-2023 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -21,6 +21,31 @@ namespace armnn_driver
 
 using namespace armnn;
 using namespace android::nn;
+
+template<typename HalPolicy,
+        typename HalOperation = typename HalPolicy::Operation,
+        typename HalModel     = typename HalPolicy::Model>
+bool IsWeightsValid(const HalOperation& operation,
+                    uint32_t inputIndex,
+                    const HalModel& model)
+{
+    using HalOperand         = typename HalPolicy::Operand;
+    using HalOperandLifeTime = typename HalPolicy::OperandLifeTime;
+    const HalOperand* operand = GetInputOperand<HalPolicy>(operation, inputIndex, model);
+    if (!operand)
+    {
+        Fail("%s: failed to get input operand %i", __func__, inputIndex);
+        return false;
+    }
+
+    if (operand->lifetime    != HalOperandLifeTime::CONSTANT_COPY
+        && operand->lifetime != HalOperandLifeTime::CONSTANT_REFERENCE
+        && operand->lifetime != HalOperandLifeTime::NO_VALUE)
+    {
+        return false;
+    }
+    return true;
+}
 
 template<typename HalPolicy,
          typename HalOperation = typename HalPolicy::Operation,
@@ -110,6 +135,157 @@ bool SetupAndTrackLayerOutputSlotAndOverrideTensorInfo(const HalOperation& opera
 }
 
 template<typename HalPolicy,
+    typename HalOperation = typename HalPolicy::Operation,
+    typename HalModel     = typename HalPolicy::Model>
+bool ConvertCast(const HalOperation& operation,
+                 const HalModel& model,
+                 ConversionData& data)
+{
+    using HalOperand = typename HalPolicy::Operand;
+
+    ALOGV("HalPolicy::ConvertCast()");
+
+    LayerInputHandle input = ConvertToLayerInputHandle<HalPolicy>(operation, 0, model, data);
+
+    if (!input.IsValid())
+    {
+        return Fail("%s: Operation has invalid inputs", __func__);
+    }
+
+    const HalOperand* output = GetOutputOperand<HalPolicy>(operation, 0, model);
+    if (!output)
+    {
+        return Fail("%s: Could not read output 0", __func__);
+    }
+
+    const TensorInfo& inputInfo  = input.GetTensorInfo();
+    const TensorInfo& outputInfo = GetTensorInfoForOperand(*output);
+
+    bool isSupported = false;
+    armnn::BackendId setBackend;
+    auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
+    {
+        FORWARD_LAYER_SUPPORT_FUNC(__func__,
+                                   IsCastSupported,
+                                   data.m_Backends,
+                                   isSupported,
+                                   setBackend,
+                                   inputInfo,
+                                   outputInfo);
+    };
+
+    if(!IsDynamicTensor(outputInfo))
+    {
+        validateFunc(outputInfo, isSupported);
+    }
+    else
+    {
+        isSupported = AreDynamicTensorsSupported();
+    }
+
+    if (!isSupported)
+    {
+        return false;
+    }
+
+    IConnectableLayer* layer = data.m_Network->AddCastLayer();
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the CastLayer", __func__);
+    }
+    input.Connect(layer->GetInputSlot(0));
+
+    return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
+}
+
+template<typename HalPolicy,
+         typename HalOperation = typename HalPolicy::Operation,
+         typename HalModel     = typename HalPolicy::Model>
+bool ConvertChannelShuffle(const HalOperation& operation,
+                           const HalModel& model,
+                           ConversionData& data)
+{
+    using HalOperand = typename HalPolicy::Operand;
+    using HalOperandType = typename HalPolicy::OperandType;
+
+    ALOGV("HalPolicy::ConvertChannelShuffle()");
+
+    LayerInputHandle input = ConvertToLayerInputHandle<HalPolicy>(operation, 0, model, data);
+    if (!input.IsValid())
+    {
+        return Fail("%s: Operation has invalid inputs", __func__);
+    }
+    auto inputDimensions = static_cast<int32_t>(input.GetTensorInfo().GetNumDimensions());
+
+    ChannelShuffleDescriptor descriptor;
+
+    int32_t groups;
+    if (!GetInputScalar<HalPolicy>(operation, 1, HalOperandType::INT32, groups, model, data))
+    {
+        return Fail("%s: Operation has invalid or unsupported number of groups operand", __func__);
+    }
+    descriptor.m_NumGroups = static_cast<uint32_t>(groups);
+
+    int32_t axis;
+    if (!GetInputScalar<HalPolicy>(operation, 2, HalOperandType::INT32, axis, model, data))
+    {
+        return Fail("%s: Operation has invalid or unsupported dimension channel shuffle operand", __func__);
+    }
+    if (((axis < -inputDimensions) && (axis < 0)) || ((axis >= inputDimensions) && (axis > 0)))
+    {
+        return Fail("%s: Operation has invalid dimension: %d. It is out of bounds [-%d, %d))", __func__, axis,
+                    inputDimensions, inputDimensions);
+    }
+    int positiveAxis = (axis < 0) ? inputDimensions + axis : axis;
+    descriptor.m_Axis = static_cast<uint32_t>(positiveAxis);
+
+    const HalOperand* output = GetOutputOperand<HalPolicy>(operation, 0, model);
+    if (!output)
+    {
+        return Fail("%s: Could not read output 0", __func__);
+    }
+
+    const TensorInfo& inputInfo  = input.GetTensorInfo();
+    const TensorInfo& outputInfo = GetTensorInfoForOperand(*output);
+
+    bool isSupported = false;
+    armnn::BackendId setBackend;
+    auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
+    {
+        FORWARD_LAYER_SUPPORT_FUNC(__func__,
+                                   IsChannelShuffleSupported,
+                                   data.m_Backends,
+                                   isSupported,
+                                   setBackend,
+                                   inputInfo,
+                                   outputInfo,
+                                   descriptor);
+    };
+
+    if(!IsDynamicTensor(outputInfo))
+    {
+        validateFunc(outputInfo, isSupported);
+    }
+    else
+    {
+        isSupported = AreDynamicTensorsSupported();
+    }
+
+    if (!isSupported)
+    {
+        return false;
+    }
+
+    IConnectableLayer* layer = data.m_Network->AddChannelShuffleLayer(descriptor);
+    layer->SetBackendId(setBackend);
+    assert(layer != nullptr);
+    input.Connect(layer->GetInputSlot(0));
+
+    return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
+}
+
+template<typename HalPolicy,
          typename HalOperation = typename HalPolicy::Operation,
          typename HalModel     = typename HalPolicy::Model>
 bool ConvertComparison_1_2(const HalOperation& operation,
@@ -143,12 +319,14 @@ bool ConvertComparison_1_2(const HalOperation& operation,
     ComparisonDescriptor descriptor(comparisonOperation);
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsComparisonSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo0,
                                    inputInfo1,
                                    outputInfo,
@@ -171,18 +349,16 @@ bool ConvertComparison_1_2(const HalOperation& operation,
     }
 
     IConnectableLayer* layer = data.m_Network->AddComparisonLayer(descriptor);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the ComparisonLayer", __func__);
+    }
 
     bool isReshapeSupported = BroadcastTensor(input0, input1, layer, data);
     if (!isReshapeSupported)
     {
         return false;
-    }
-
-    if(IsDynamicTensor(outputInfo))
-    {
-        input0.Connect(layer->GetInputSlot(0));
-        input1.Connect(layer->GetInputSlot(1));
     }
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
@@ -237,26 +413,31 @@ bool ConvertConv2d_1_2(const HalOperation& operation, const HalModel& model, Con
     // The NNAPI filter is always OHWI [depth_out, filter_height, filter_width, depth_in] but ArmNN expects the
     // filter's height and width indices to match the input's height and width indices so we permute it to OIHW if
     // the DataLayout is NCHW
-    const ConstTensorPin weightsPin = (desc.m_DataLayout == DataLayout::NCHW) ?
-                                      ConvertOperationInputToConstTensorPin<HalPolicy>(operation, 1,
-                                                                                       model, data, OHWIToOIHW) :
-                                      ConvertOperationInputToConstTensorPin<HalPolicy>(operation, 1, model, data);
-    const ConstTensorPin biasPin    =
-        ConvertOperationInputToConstTensorPin<HalPolicy>(operation, 2, model, data);
 
-    if (!weightsPin.IsValid())
+
+    if (!IsWeightsValid<HalPolicy>(operation, 1, model) && desc.m_DataLayout == DataLayout::NCHW)
     {
-        return Fail("%s: Operation has invalid weights", __func__);
+        return Fail("%s: Operation has unsupported weights HalOperandLifeTime", __func__);
     }
 
-    if (!biasPin.IsValid())
+    LayerInputHandle weightsInput = (desc.m_DataLayout == DataLayout::NCHW) ?
+                                     ConvertToLayerInputHandle<HalPolicy>(operation, 1, model, data, OHWIToOIHW) :
+                                     ConvertToLayerInputHandle<HalPolicy>(operation, 1, model, data);
+
+    if (!weightsInput.IsValid())
     {
-        return Fail("%s: Operation has invalid biases", __func__);
+        return Fail("%s: Operation has invalid inputs", __func__);
     }
 
-    ConstTensor weights = weightsPin.GetConstTensor();
-    ConstTensor bias = biasPin.GetConstTensor();
-    SanitizeBiasQuantizationScale(bias.GetInfo(), weights.GetInfo(), inputInfo);
+    LayerInputHandle biasInput = ConvertToLayerInputHandle<HalPolicy>(operation, 2, model, data); // 1D
+    if (!biasInput.IsValid())
+    {
+        return Fail("%s: Operation has invalid inputs", __func__);
+    }
+
+    biasInput.SanitizeQuantizationScale(weightsInput, input);
+    armnn::TensorInfo weightsInfo = weightsInput.GetTensorInfo();
+    armnn::TensorInfo biasInfo = biasInput.GetTensorInfo();
 
     ActivationFn activation;
 
@@ -275,8 +456,8 @@ bool ConvertConv2d_1_2(const HalOperation& operation, const HalModel& model, Con
         armnnUtils::DataLayoutIndexed dataLayoutIndexed(desc.m_DataLayout);
         unsigned int widthIndex = dataLayoutIndexed.GetWidthIndex();
         unsigned int heightIndex = dataLayoutIndexed.GetHeightIndex();
-        const uint32_t kernelX = weights.GetShape()[widthIndex];
-        const uint32_t kernelY = weights.GetShape()[heightIndex];
+        const uint32_t kernelX = weightsInfo.GetShape()[widthIndex];
+        const uint32_t kernelY = weightsInfo.GetShape()[heightIndex];
         const uint32_t inputX  = inputInfo.GetShape()[widthIndex];
         const uint32_t inputY  = inputInfo.GetShape()[heightIndex];
 
@@ -305,19 +486,21 @@ bool ConvertConv2d_1_2(const HalOperation& operation, const HalModel& model, Con
     }
 
     desc.m_BiasEnabled = true;
-    Optional<TensorInfo> biases(bias.GetInfo());
+    Optional<TensorInfo> biases(biasInfo);
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsConvolution2dSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    outputInfo,
                                    desc,
-                                   weights.GetInfo(),
+                                   weightsInfo,
                                    biases);
     };
 
@@ -335,8 +518,8 @@ bool ConvertConv2d_1_2(const HalOperation& operation, const HalModel& model, Con
         return false;
     }
 
-    IConnectableLayer* startLayer =
-        data.m_Network->AddConvolution2dLayer(desc, weights, Optional<ConstTensor>(bias));
+    armnn::IConnectableLayer* startLayer = data.m_Network->AddConvolution2dLayer(desc);
+    startLayer->SetBackendId(setBackend);
 
     if (!startLayer)
     {
@@ -344,6 +527,8 @@ bool ConvertConv2d_1_2(const HalOperation& operation, const HalModel& model, Con
     }
 
     input.Connect(startLayer->GetInputSlot(0));
+    weightsInput.Connect(startLayer->GetInputSlot(1));
+    biasInput.Connect(startLayer->GetInputSlot(2));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *startLayer, model,
                                                    data, nullptr, validateFunc, activation);
@@ -379,12 +564,11 @@ bool ConvertDepthwiseConv2d_1_2(const HalOperation& operation, const HalModel& m
     // ArmNN does not currently support non-fixed weights or bias
     // Find the shape of the weights tensor. In AndroidNN this will be [ 1, H, W, I * M ]
     const HalOperand* weightsOperand = GetInputOperand<HalPolicy>(operation, 1, model);
-
-    if (weightsOperand == nullptr)
+    if (!weightsOperand)
     {
-        return Fail("%s: Operand is invalid", __func__);
+        return Fail("%s: Could not read weights", __func__);
     }
-    if ( weightsOperand->dimensions[0] != 1)
+    if (weightsOperand->dimensions[0] != 1)
     {
         return Fail("%s: Invalid weights; for depthwise convolution, dimension 0 must be 1 but it is %i",
                     __func__, weightsOperand->dimensions[0] );
@@ -403,44 +587,30 @@ bool ConvertDepthwiseConv2d_1_2(const HalOperation& operation, const HalModel& m
     desc.m_DataLayout = OptionalDataLayout<HalPolicy>(operation, dataLayoutFlagIndex, model, data);
 
     armnnUtils::DataLayoutIndexed dataLayoutIndexed(desc.m_DataLayout);
-    unsigned int channelsIndex = dataLayoutIndexed.GetChannelsIndex();
     unsigned int widthIndex = dataLayoutIndexed.GetWidthIndex();
     unsigned int heightIndex = dataLayoutIndexed.GetHeightIndex();
 
-    // Reinterpret weight data as [ H, W, I, M ]
-    TensorShape weightsShape({ weightsOperand->dimensions[1],
-                               weightsOperand->dimensions[2],
-                               inputInfo.GetShape()[channelsIndex],
-                               weightsOperand->dimensions[3] / inputInfo.GetShape()[channelsIndex] });
-
-    // Swizzle weight data [ H, W, I, M ] -> [ M, I, H, W ]
-    const PermutationVector HWIMToMIHW = { 2U, 3U, 1U, 0U };
-
-    const ConstTensorPin weightsPin =
-        ConvertOperationInputToConstTensorPin<HalPolicy>(operation,
-                                                         1,
-                                                         model,
-                                                         data,
-                                                         HWIMToMIHW,
-                                                         &weightsShape);
-
-    // Bias is a 1D tensor
-    const ConstTensorPin biasPin =
-        ConvertOperationInputToConstTensorPin<HalPolicy>(operation, 2, model, data);
-
-    if (!weightsPin.IsValid())
+    LayerInputHandle weightsInput = ConvertToLayerInputHandle<HalPolicy>(operation, 1, model, data);
+    if (!weightsInput.IsValid())
     {
-        return Fail("%s: Operation has invalid weights", __func__);
+        return Fail("%s: Operation has invalid inputs", __func__);
     }
 
-    if (!biasPin.IsValid())
+    const HalOperand* biasOperand = GetInputOperand<HalPolicy>(operation, 2, model);
+    if (!biasOperand)
     {
-        return Fail("%s: Operation has invalid biases", __func__);
+        return Fail("%s: Could not read bias", __func__);
     }
 
-    ConstTensor weights = weightsPin.GetConstTensor();
-    ConstTensor bias = biasPin.GetConstTensor();
-    SanitizeBiasQuantizationScale(bias.GetInfo(), weights.GetInfo(), inputInfo);
+    LayerInputHandle biasInput = ConvertToLayerInputHandle<HalPolicy>(operation, 2, model, data); // 1D
+    if (!biasInput.IsValid())
+    {
+        return Fail("%s: Operation has invalid inputs", __func__);
+    }
+
+    biasInput.SanitizeQuantizationScale(weightsInput, input);
+    armnn::TensorInfo weightsInfo = weightsInput.GetTensorInfo();
+    armnn::TensorInfo biasInfo = biasInput.GetTensorInfo();
 
     ActivationFn activation;
 
@@ -456,8 +626,8 @@ bool ConvertDepthwiseConv2d_1_2(const HalOperation& operation, const HalModel& m
             return Fail("%s: Operation has invalid inputs (implicit padding)", __func__);
         }
 
-        const uint32_t kernelX = weights.GetShape()[3];
-        const uint32_t kernelY = weights.GetShape()[2];
+        const uint32_t kernelX = weightsInfo.GetShape()[2];
+        const uint32_t kernelY = weightsInfo.GetShape()[1];
         const uint32_t inputX  = inputInfo.GetShape()[widthIndex];
         const uint32_t inputY  = inputInfo.GetShape()[heightIndex];
 
@@ -485,19 +655,21 @@ bool ConvertDepthwiseConv2d_1_2(const HalOperation& operation, const HalModel& m
     }
 
     desc.m_BiasEnabled = true;
-    Optional<TensorInfo> biases(bias.GetInfo());
+    Optional<TensorInfo> biases(biasInfo);
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsDepthwiseConvolutionSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    outputInfo,
                                    desc,
-                                   weights.GetInfo(),
+                                   weightsInfo,
                                    biases);
     };
 
@@ -515,8 +687,8 @@ bool ConvertDepthwiseConv2d_1_2(const HalOperation& operation, const HalModel& m
         return false;
     }
 
-    IConnectableLayer* startLayer =
-        data.m_Network->AddDepthwiseConvolution2dLayer(desc, weights, Optional<ConstTensor>(bias));
+    armnn::IConnectableLayer* startLayer = data.m_Network->AddDepthwiseConvolution2dLayer(desc);
+    startLayer->SetBackendId(setBackend);
 
     if (!startLayer)
     {
@@ -524,6 +696,10 @@ bool ConvertDepthwiseConv2d_1_2(const HalOperation& operation, const HalModel& m
     }
 
     input.Connect(startLayer->GetInputSlot(0));
+
+    // Connect weights and bias inputs
+    weightsInput.Connect(startLayer->GetInputSlot(1));
+    biasInput.Connect(startLayer->GetInputSlot(2));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *startLayer, model,
                                                    data, nullptr, validateFunc, activation);
@@ -578,13 +754,14 @@ bool ConvertElementwiseUnary(const HalOperation& operation,
     ElementwiseUnaryDescriptor descriptor(unaryOperation);
 
     bool isSupported = false;
-
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsElementwiseUnarySupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    outputInfo,
                                    descriptor);
@@ -605,7 +782,11 @@ bool ConvertElementwiseUnary(const HalOperation& operation,
     }
 
     IConnectableLayer* layer = data.m_Network->AddElementwiseUnaryLayer(descriptor);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the ElementwiseUnaryLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
@@ -653,21 +834,18 @@ bool ConvertExpandDims(const HalOperation& operation, const HalModel& model, Con
         return Fail("%s: %s", __func__, e.what());
     }
 
-    if (targetShape != outputInfo.GetShape())
-    {
-        return Fail("%s: Shape of the output operand does not match the resolved expanded shape", __func__);
-    }
-
     ReshapeDescriptor reshapeDescriptor;
     reshapeDescriptor.m_TargetShape = targetShape;
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsReshapeSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    input.GetTensorInfo(),
                                    outputInfo,
                                    reshapeDescriptor);
@@ -675,6 +853,10 @@ bool ConvertExpandDims(const HalOperation& operation, const HalModel& model, Con
 
     if(!IsDynamicTensor(outputInfo))
     {
+        if (targetShape != outputInfo.GetShape())
+        {
+            return Fail("%s: Shape of the output operand does not match the resolved expanded shape", __func__);
+        }
         validateFunc(outputInfo, isSupported);
     }
     else
@@ -688,7 +870,11 @@ bool ConvertExpandDims(const HalOperation& operation, const HalModel& model, Con
     }
 
     IConnectableLayer* layer = data.m_Network->AddReshapeLayer(reshapeDescriptor);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the ReshapeLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
@@ -736,7 +922,8 @@ bool ConvertGather(const HalOperation& operation, const HalModel& model, Convers
     {
         return Fail("%s: Operation has invalid or unsupported axis operand", __func__);
     }
-    if (((axis < -inputDimensions) && (axis < 0)) || ((axis >= inputDimensions) && (axis > 0)))
+    int32_t inputDimensions_int = static_cast<int32_t>(inputDimensions);
+    if ((axis < -inputDimensions_int) || (inputDimensions_int <= axis))
     {
         return Fail("%s: Operation has invalid axis: %d. It is out of bounds [-%d, %d))", __func__, axis,
                     inputDimensions, inputDimensions);
@@ -746,12 +933,14 @@ bool ConvertGather(const HalOperation& operation, const HalModel& model, Convers
     desc.m_Axis = axis;
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsGatherSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    input.GetTensorInfo(),
                                    indices.GetTensorInfo(),
                                    outputInfo,
@@ -773,7 +962,11 @@ bool ConvertGather(const HalOperation& operation, const HalModel& model, Convers
     }
 
     IConnectableLayer* layer = data.m_Network->AddGatherLayer(desc);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the GatherLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
     indices.Connect(layer->GetInputSlot(1));
 
@@ -841,7 +1034,6 @@ bool ConvertGroupedConv2d(const HalOperation& operation, const HalModel& model, 
     const TensorShape& inputShape   = inputInfo.GetShape();
     const TensorShape& outputShape  = outputInfo.GetShape();
     const TensorShape& weightsShape = weights.GetShape();
-    const TensorShape& biasesShape  = biases.GetShape();
 
     armnnUtils::DataLayoutIndexed dataLayoutIndexed(dataLayout);
     const unsigned int channelsIndex = dataLayoutIndexed.GetChannelsIndex();
@@ -852,7 +1044,7 @@ bool ConvertGroupedConv2d(const HalOperation& operation, const HalModel& model, 
     desc.m_DataLayout  = dataLayout;
     desc.m_BiasEnabled = true;
 
-    int numGroups;
+    unsigned int numGroups;
     ActivationFn activation;
 
     if (operation.inputs.size() == 12)
@@ -940,10 +1132,12 @@ bool ConvertGroupedConv2d(const HalOperation& operation, const HalModel& model, 
     }
 
     bool isSupported = false;
+    armnn::BackendId setBackendSplit;
     FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                IsSplitterSupported,
                                data.m_Backends,
                                isSupported,
+                               setBackendSplit,
                                inputInfo,
                                splitterOutputInfos,
                                splitterDesc);
@@ -953,6 +1147,7 @@ bool ConvertGroupedConv2d(const HalOperation& operation, const HalModel& model, 
     }
 
     IConnectableLayer* splitterLayer = data.m_Network->AddSplitterLayer(splitterDesc);
+    splitterLayer->SetBackendId(setBackendSplit);
     if (!splitterLayer)
     {
         return Fail("%s: Failed to add SplitterLayer", __func__);
@@ -1036,12 +1231,14 @@ bool ConvertGroupedConv2d(const HalOperation& operation, const HalModel& model, 
                                                               biasesDataOffset));
 
             isSupported = false;
+            armnn::BackendId setBackendConv;
             auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
             {
                 FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                            IsConvolution2dSupported,
                                            data.m_Backends,
                                            isSupported,
+                                           setBackendConv,
                                            groupInputInfo,
                                            outputInfo,
                                            desc,
@@ -1063,14 +1260,22 @@ bool ConvertGroupedConv2d(const HalOperation& operation, const HalModel& model, 
                 return false;
             }
 
-            IConnectableLayer* convLayer =
-                data.m_Network->AddConvolution2dLayer(desc, groupWeights, Optional<ConstTensor>(groupBiases));
+            IConnectableLayer* weightsLayer = data.m_Network->AddConstantLayer(groupWeights);
+            IConnectableLayer* biasLayer = data.m_Network->AddConstantLayer(groupBiases);
+            IConnectableLayer* convLayer = data.m_Network->AddConvolution2dLayer(desc);
+            convLayer->SetBackendId(setBackendConv);
+
             if (!convLayer)
             {
                 return Fail("%s: AddConvolution2dLayer failed", __func__);
             }
 
             splitterLayer->GetOutputSlot(group).Connect(convLayer->GetInputSlot(0));
+            weightsLayer->GetOutputSlot(0).Connect(convLayer->GetInputSlot(1));
+            biasLayer->GetOutputSlot(0).Connect(convLayer->GetInputSlot(2));
+
+            weightsLayer->GetOutputSlot(0).SetTensorInfo(groupWeightsInfo);
+            biasLayer->GetOutputSlot(0).SetTensorInfo(groupBiasesInfo);
             convLayer->GetOutputSlot(0).SetTensorInfo(groupOutputInfo);
 
             if(isDynamic)
@@ -1108,10 +1313,12 @@ bool ConvertGroupedConv2d(const HalOperation& operation, const HalModel& model, 
     }
 
     isSupported = false;
+    armnn::BackendId setBackendConcat;
     FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                IsConcatSupported,
                                data.m_Backends,
                                isSupported,
+                               setBackendConcat,
                                std::vector<const TensorInfo*>(numGroups * channelMultiplier, &groupOutputInfo),
                                outputInfo,
                                concatDescriptor);
@@ -1122,6 +1329,7 @@ bool ConvertGroupedConv2d(const HalOperation& operation, const HalModel& model, 
     }
 
     IConnectableLayer* concatLayer = data.m_Network->AddConcatLayer(concatDescriptor);
+    concatLayer->SetBackendId(setBackendConcat);
     if (!concatLayer)
     {
         return Fail("%s: AddConcatLayer failed", __func__);
@@ -1209,12 +1417,14 @@ bool ConvertInstanceNormalization(const HalOperation& operation, const HalModel&
     desc.m_DataLayout = OptionalDataLayout<HalPolicy>(operation, 4, model, data);
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsInstanceNormalizationSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    input.GetTensorInfo(),
                                    outputInfo,
                                    desc);
@@ -1235,6 +1445,7 @@ bool ConvertInstanceNormalization(const HalOperation& operation, const HalModel&
     }
 
     IConnectableLayer* layer = data.m_Network->AddInstanceNormalizationLayer(desc);
+    layer->SetBackendId(setBackend);
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
@@ -1303,12 +1514,14 @@ bool ConvertLogSoftmax(const HalOperation& operation, const HalModel& model, Con
     }
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsLogSoftmaxSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    input.GetTensorInfo(),
                                    outputInfo,
                                    descriptor);
@@ -1329,136 +1542,12 @@ bool ConvertLogSoftmax(const HalOperation& operation, const HalModel& model, Con
     }
 
     IConnectableLayer* layer = data.m_Network->AddLogSoftmaxLayer(descriptor);
+    layer->SetBackendId(setBackend);
     if (!layer)
     {
-        return Fail("%s: AddLogSoftmaxLayer() returned nullptr", __func__);
+        return Fail("%s: Could not add the LogSoftmaxLayer", __func__);
     }
-
     input.Connect(layer->GetInputSlot(0));
-
-    return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
-}
-
-template<typename HalPolicy,
-         typename HalOperation = typename HalPolicy::Operation,
-         typename HalModel     = typename HalPolicy::Model>
-bool ConvertMaximum(const HalOperation& operation, const HalModel& model, ConversionData& data)
-{
-    using HalOperand = typename HalPolicy::Operand;
-
-    ALOGV("HalPolicy::ConvertMaximum()");
-
-    LayerInputHandle input0 = ConvertToLayerInputHandle<HalPolicy>(operation, 0, model, data);
-    LayerInputHandle input1 = ConvertToLayerInputHandle<HalPolicy>(operation, 1, model, data);
-
-    if (!input0.IsValid() || !input1.IsValid())
-    {
-        return Fail("%s: Operation has invalid inputs", __func__);
-    }
-
-    const HalOperand* outputOperand = GetOutputOperand<HalPolicy>(operation, 0, model);
-    if (!outputOperand)
-    {
-        return Fail("%s: Could not read output", __func__);
-    }
-
-    const TensorInfo& outInfo = GetTensorInfoForOperand(*outputOperand);
-
-    bool isSupported = false;
-    auto validateFunc = [&](const armnn::TensorInfo& outInfo, bool& isSupported)
-    {
-        FORWARD_LAYER_SUPPORT_FUNC(__func__,
-                                   IsMaximumSupported,
-                                   data.m_Backends,
-                                   isSupported,
-                                   input0.GetTensorInfo(),
-                                   input1.GetTensorInfo(),
-                                   outInfo);
-    };
-
-    if(IsDynamicTensor(outInfo))
-    {
-        isSupported = AreDynamicTensorsSupported();
-    }
-    else
-    {
-        validateFunc(outInfo, isSupported);
-    }
-
-    if (!isSupported)
-    {
-        return false;
-    }
-
-    IConnectableLayer* layer = data.m_Network->AddMaximumLayer();
-    assert(layer != nullptr);
-    bool isReshapeSupported = BroadcastTensor(input0, input1, layer, data);
-    if (!isReshapeSupported)
-    {
-        return false;
-    }
-
-    return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
-}
-
-template<typename HalPolicy,
-         typename HalOperation = typename HalPolicy::Operation,
-         typename HalModel     = typename HalPolicy::Model>
-bool ConvertMinimum(const HalOperation& operation, const HalModel& model, ConversionData& data)
-{
-    using HalOperand = typename HalPolicy::Operand;
-
-    ALOGV("HalPolicy::ConvertMinimum()");
-
-    LayerInputHandle input0 = ConvertToLayerInputHandle<HalPolicy>(operation, 0, model, data);
-    LayerInputHandle input1 = ConvertToLayerInputHandle<HalPolicy>(operation, 1, model, data);
-
-    if (!input0.IsValid() || !input1.IsValid())
-    {
-        return Fail("%s: Operation has invalid inputs", __func__);
-    }
-
-    const HalOperand* output = GetOutputOperand<HalPolicy>(operation, 0, model);
-    if (!output)
-    {
-        return Fail("%s: Could not read output 0", __func__);
-    }
-
-    const TensorInfo& outputInfo = GetTensorInfoForOperand(*output);
-
-    bool isSupported = false;
-    auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
-    {
-        FORWARD_LAYER_SUPPORT_FUNC(__func__,
-                                   IsMinimumSupported,
-                                   data.m_Backends,
-                                   isSupported,
-                                   input0.GetTensorInfo(),
-                                   input1.GetTensorInfo(),
-                                   outputInfo);
-    };
-
-    if(IsDynamicTensor(outputInfo))
-    {
-        isSupported = AreDynamicTensorsSupported();
-    }
-    else
-    {
-        validateFunc(outputInfo, isSupported);
-    }
-
-    if (!isSupported)
-    {
-        return false;
-    }
-
-    IConnectableLayer* const layer = data.m_Network->AddMinimumLayer();
-    assert(layer != nullptr);
-    bool isReshapeSupported = BroadcastTensor(input0, input1, layer, data);
-    if (!isReshapeSupported)
-    {
-        return false;
-    }
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
 }
@@ -1524,7 +1613,7 @@ bool ConvertPadV2(const HalOperation& operation, const HalModel& model, Conversi
             return Fail("%s: Could not read input 2 (FLOAT32)", __func__);
         }
     }
-    else if (operandType0 == HalOperandType::TENSOR_QUANT8_ASYMM && operandType2 == HalOperandType::INT32)
+    else if (isQuantizedOperand(operandType0) && operandType2 == HalOperandType::INT32)
     {
         int32_t intPadValue = 0;
         if (!GetInputInt32<HalPolicy>(operation, 2, intPadValue, model, data))
@@ -1539,12 +1628,14 @@ bool ConvertPadV2(const HalOperation& operation, const HalModel& model, Conversi
     }
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsPadSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    outputInfo,
                                    descriptor);
@@ -1565,7 +1656,11 @@ bool ConvertPadV2(const HalOperation& operation, const HalModel& model, Conversi
     }
 
     IConnectableLayer* const layer = data.m_Network->AddPadLayer(descriptor);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the PadLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
@@ -1600,12 +1695,14 @@ bool ConvertPrelu(const HalOperation& operation, const HalModel& model, Conversi
     const TensorInfo& outputInfo = GetTensorInfoForOperand(*output);
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsPreluSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    alphaInfo,
                                    outputInfo);
@@ -1626,10 +1723,10 @@ bool ConvertPrelu(const HalOperation& operation, const HalModel& model, Conversi
     }
 
     IConnectableLayer* const layer = data.m_Network->AddPreluLayer();
-
+    layer->SetBackendId(setBackend);
     if (!layer)
     {
-        return Fail("%s: AddPreluLayer failed", __func__);
+        return Fail("%s: Could not add the PreluLayer", __func__);
     }
 
     bool isReshapeSupported = BroadcastTensor(input, alpha, layer, data);
@@ -1665,12 +1762,14 @@ bool ConvertQuantize(const HalOperation& operation, const HalModel& model, Conve
     const TensorInfo& outputInfo = GetTensorInfoForOperand(*outputOperand);
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsQuantizeSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    input.GetTensorInfo(),
                                    outputInfo);
     };
@@ -1690,7 +1789,11 @@ bool ConvertQuantize(const HalOperation& operation, const HalModel& model, Conve
     }
 
     IConnectableLayer* const layer = data.m_Network->AddQuantizeLayer();
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the QuantizeLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
@@ -1884,12 +1987,14 @@ bool ConvertQuantized16BitLstm(const HalOperation& operation, const HalModel& mo
     paramsInfo.m_OutputGateBias           = &(params.m_OutputGateBias->GetInfo());
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsQuantizedLstmSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    previousCellStateInInfo,
                                    previousOutputInInfo,
@@ -1916,6 +2021,7 @@ bool ConvertQuantized16BitLstm(const HalOperation& operation, const HalModel& mo
     }
 
     IConnectableLayer* const layer = data.m_Network->AddQuantizedLstmLayer(params, "QuantizedLstm");
+    layer->SetBackendId(setBackend);
     input.Connect(layer->GetInputSlot(0));
     previousCellStateIn.Connect(layer->GetInputSlot(1));
     previousOutputIn.Connect(layer->GetInputSlot(2));
@@ -1932,6 +2038,98 @@ bool ConvertQuantized16BitLstm(const HalOperation& operation, const HalModel& mo
                     operation, 1, *layer, 1, model, data, nullptr, validateFunc, ActivationFn::kActivationNone, true));
     }
 
+}
+
+template<typename HalPolicy,
+         typename HalOperation = typename HalPolicy::Operation,
+         typename HalModel     = typename HalPolicy::Model>
+bool ConvertReduce(const HalOperation& operation,
+                   const HalModel& model,
+                   ConversionData& data,
+                   ReduceOperation reduceOperation)
+{
+    using HalOperand     = typename HalPolicy::Operand;
+    using HalOperandType = typename HalPolicy::OperandType;
+
+    armnn::ReduceDescriptor descriptor;
+    descriptor.m_ReduceOperation = reduceOperation;
+
+    LayerInputHandle input = ConvertToLayerInputHandle<HalPolicy>(operation, 0, model, data);
+    if (!input.IsValid())
+    {
+        return Fail("%s: Operation has invalid inputs", __func__);
+    }
+    const armnn::TensorInfo& inputInfo = input.GetTensorInfo();
+
+    const HalOperand* output = GetOutputOperand<HalPolicy>(operation, 0, model);
+    if (!output)
+    {
+        return Fail("%s: Could not read output 0", __func__);
+    }
+    const armnn::TensorInfo& outputInfo = GetTensorInfoForOperand(*output);
+
+    const HalOperand* axisOperand = GetInputOperand<HalPolicy>(operation, 1, model);
+    if (!axisOperand)
+    {
+        return Fail("%s: Could not read input 1", __func__);
+    }
+    std::vector<int32_t> axis;
+    if (!GetTensorInt32Values<HalPolicy>(*axisOperand, axis, model, data))
+    {
+        return Fail("%s: Input 1 has invalid values", __func__);
+    }
+
+    // Convert the axis to unsigned int and remove duplicates.
+    unsigned int rank = inputInfo.GetNumDimensions();
+    std::set<unsigned int> uniqueAxis;
+    std::transform(axis.begin(), axis.end(),
+                   std::inserter(uniqueAxis, uniqueAxis.begin()),
+                   [rank](int i) -> unsigned int { return (i + rank) % rank; });
+    descriptor.m_vAxis.assign(uniqueAxis.begin(), uniqueAxis.end());
+
+    // Get the "keep dims" flag.
+    if (!GetInputScalar<HalPolicy>(operation, 2, HalOperandType::BOOL, descriptor.m_KeepDims, model, data))
+    {
+        return Fail("%s: Could not read input 2", __func__);
+    }
+
+    bool isSupported = false;
+    armnn::BackendId setBackend;
+    auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
+    {
+        FORWARD_LAYER_SUPPORT_FUNC(__func__,
+                                   IsReduceSupported,
+                                   data.m_Backends,
+                                   isSupported,
+                                   setBackend,
+                                   inputInfo,
+                                   outputInfo,
+                                   descriptor);
+    };
+
+    if(!IsDynamicTensor(outputInfo))
+    {
+        validateFunc(outputInfo, isSupported);
+    }
+    else
+    {
+        isSupported = AreDynamicTensorsSupported();
+    }
+
+    if (!isSupported)
+    {
+        return false;
+    }
+
+    armnn::IConnectableLayer* const layer = data.m_Network->AddReduceLayer(descriptor);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the ReduceLayer", __func__);
+    }
+    input.Connect(layer->GetInputSlot(0));
+
+    return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
 }
 
 template<typename HalPolicy,
@@ -2051,12 +2249,14 @@ bool ConvertResize(const HalOperation& operation,
     descriptor.m_HalfPixelCenters = GetOptionalBool<HalPolicy>(operation, 5, model, data);
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsResizeSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    outputInfo,
                                    descriptor);
@@ -2077,7 +2277,11 @@ bool ConvertResize(const HalOperation& operation,
     }
 
     IConnectableLayer* layer = data.m_Network->AddResizeLayer(descriptor);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the ResizeLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
@@ -2126,12 +2330,14 @@ bool ConvertSpaceToDepth(const HalOperation& operation, const HalModel& model, C
     desc.m_DataLayout = OptionalDataLayout<HalPolicy>(operation, 2, model, data);
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsSpaceToDepthSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    outputInfo,
                                    desc);
@@ -2152,7 +2358,11 @@ bool ConvertSpaceToDepth(const HalOperation& operation, const HalModel& model, C
     }
 
     IConnectableLayer* const layer = data.m_Network->AddSpaceToDepthLayer(desc);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the SpaceToDepthLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
@@ -2216,12 +2426,14 @@ bool ConvertSoftmax(const HalOperation& operation, const HalModel& model, Conver
     }
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsSoftmaxSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    input.GetTensorInfo(),
                                    outputInfo,
                                    desc);
@@ -2242,7 +2454,11 @@ bool ConvertSoftmax(const HalOperation& operation, const HalModel& model, Conver
     }
 
     IConnectableLayer* layer = data.m_Network->AddSoftmaxLayer(desc);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the SoftmaxLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, model, data, nullptr, validateFunc);
@@ -2389,7 +2605,7 @@ bool ConvertLstm(const HalOperation& operation, const HalModel& model, Conversio
     //     If set to 0.0 then clipping is disabled.
     // 22: The clipping threshold: for the output from the projection layer, such that values are bound within
     //     [-proj_clip, proj_clip]. If set to 0.0 then clipping is disabled.
-    ActivationFn activation;
+    ActivationFn activation = ActivationFn::kActivationNone;
     float cellClip;
     float projClip;
     if (!GetInputActivationFunctionFromTensor<HalPolicy>(operation, 20, activation, model, data) ||
@@ -2603,12 +2819,14 @@ bool ConvertLstm(const HalOperation& operation, const HalModel& model, Conversio
     }
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsLstmSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    outputStateInInfo,
                                    cellStateInInfo,
@@ -2641,6 +2859,7 @@ bool ConvertLstm(const HalOperation& operation, const HalModel& model, Conversio
 
     // Add the layer
     IConnectableLayer* layer = data.m_Network->AddLstmLayer(desc, params, "Lstm");
+    layer->SetBackendId(setBackend);
 
     input.Connect(layer->GetInputSlot(0));
     outputStateIn.Connect(layer->GetInputSlot(1));
@@ -2840,12 +3059,14 @@ bool ConvertTransposeConv2d(const HalOperation& operation, const HalModel& model
     Optional<TensorInfo> biases(bias.GetInfo());
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
     {
         FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                    IsTransposeConvolution2dSupported,
                                    data.m_Backends,
                                    isSupported,
+                                   setBackend,
                                    inputInfo,
                                    outputInfo,
                                    desc,
@@ -2868,6 +3089,7 @@ bool ConvertTransposeConv2d(const HalOperation& operation, const HalModel& model
 
     IConnectableLayer* startLayer =
         data.m_Network->AddTransposeConvolution2dLayer(desc, weights, Optional<ConstTensor>(bias));
+    startLayer->SetBackendId(setBackend);
     if (!startLayer)
     {
         return Fail("%s: AddTransposeConvolution2dLayer failed", __func__);
@@ -2877,6 +3099,452 @@ bool ConvertTransposeConv2d(const HalOperation& operation, const HalModel& model
 
     return SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *startLayer, model,
                                                    data, nullptr, validateFunc, activation);
+}
+
+template<typename HalPolicy,
+         typename HalOperation = typename HalPolicy::Operation,
+         typename HalModel     = typename HalPolicy::Model>
+bool ConvertUnidirectionalSequenceLstm(const HalOperation& operation,
+                                       const HalModel& model,
+                                       ConversionData& data)
+{
+    using HalOperand = typename HalPolicy::Operand;
+    using HalOperandType = typename HalPolicy::OperandType;
+
+    ALOGV("HalPolicy::ConvertUnidirectionalSequenceLstm()");
+
+    // Determine if input OperandType is ANEURALNETWORKS_TENSOR_FLOAT 32 or 16
+    HalOperandType inputType;
+    if (!GetOperandType<HalPolicy>(operation, 0, model, inputType))
+    {
+        return Fail("%s: Operation has invalid inputs", __func__);
+    }
+
+    // Inputs:
+    // 0: The input: A 3-D tensor of shape: If time-major: [max_time, batch_size, input_size] If batch-major:
+    // [batch_size, max_time, input_size] where “max_time” is the number of timesteps (sequence length), “batch_size”
+    // corresponds to the batching dimension, and “input_size” is the size of the input.
+    LayerInputHandle input = ConvertToLayerInputHandle<HalPolicy>(operation, 0, model, data);
+    if (!input.IsValid())
+    {
+        return Fail("%s: Could not read input 0: input", __func__);
+    }
+    // 18: The output state: A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape [batch_size, output_size].
+    LayerInputHandle outputStateIn = ConvertToLayerInputHandle<HalPolicy>(operation, 18, model, data);
+    if (!outputStateIn.IsValid())
+    {
+        return Fail("%s: Could not read input 18: outputStateIn", __func__);
+    }
+    // 19: The cell state: A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape [batch_size, num_units].
+    LayerInputHandle cellStateIn = ConvertToLayerInputHandle<HalPolicy>(operation, 19, model, data);
+    if (!cellStateIn.IsValid())
+    {
+        return Fail("%s: Could not read input 19: cellStateIn", __func__);
+    }
+
+    // Get the mandatory input tensors:
+    // 02: The input-to-forget weights: A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape
+    //     [num_units, input_size].
+    const ConstTensorPin inputToForgetWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 2));
+    // 03: The input-to-cell weights: A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape
+    // [num_units, input_size].
+    const ConstTensorPin inputToCellWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 3));
+    // 04: The input-to-output weights: A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape
+    //     [num_units, input_size].
+    const ConstTensorPin inputToOutputWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 4));
+    // 06: The recurrent-to-forget weights: A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape
+    //     [num_units, output_size].
+    const ConstTensorPin recurrentToForgetWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 6));
+    // 07: The recurrent-to-cell weights: A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32, of shape
+    //     [num_units, output_size].
+    const ConstTensorPin recurrentToCellWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 7));
+    // 08: The recurrent-to-output weights: A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape
+    //     [num_units, output_size].
+    const ConstTensorPin recurrentToOutputWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 8));
+    // 13: The forget gate bias: A 1-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape [num_units].
+    const ConstTensorPin forgetGateBiasPin =
+                             ConvertOperationInputToConstTensorPin<HalPolicy>(operation, 13, model, data);
+    // 14: The cell bias: A 1-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape [num_units].
+    const ConstTensorPin cellBiasPin =
+                             ConvertOperationInputToConstTensorPin<HalPolicy>(operation, 14, model, data);
+    // 15: The output gate bias: A 1-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape [num_units].
+    const ConstTensorPin outputGateBiasPin =
+                             ConvertOperationInputToConstTensorPin<HalPolicy>(operation, 15, model, data);
+
+    if (!inputToForgetWeightsPin.IsValid() ||
+        !inputToCellWeightsPin.IsValid() ||
+        !inputToOutputWeightsPin.IsValid() ||
+        !recurrentToForgetWeightsPin.IsValid() ||
+        !recurrentToCellWeightsPin.IsValid() ||
+        !recurrentToOutputWeightsPin.IsValid() ||
+        !forgetGateBiasPin.IsValid() ||
+        !cellBiasPin.IsValid() ||
+        !outputGateBiasPin.IsValid())
+    {
+        return Fail("%s: Operation has invalid tensor inputs", __func__);
+    }
+
+    // Get the optional input tensors:
+    // 01: The input-to-input weights: Optional. A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape
+    //     [num_units, input_size], where “num_units” corresponds to the number of cell units.
+    const ConstTensorPin inputToInputWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 1, true));
+    // 05: The recurrent-to-input weights: Optional. A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape
+    //     [num_units, output_size], where “output_size” corresponds to either the number of cell units (i.e.,
+    //     “num_units”), or the second dimension of the “projection_weights”, if defined.
+    const ConstTensorPin recurrentToInputWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 5, true));
+    // 09: The cell-to-input weights: Optional.
+    // A 1-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape [num_units].
+    const ConstTensorPin cellToInputWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 9, true));
+    // 10: The cell-to-forget weights: Optional.
+    // A 1-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape [num_units].
+    const ConstTensorPin cellToForgetWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 10, true));
+    // 11: The cell-to-output weights: Optional.
+    // A 1-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape [num_units].
+    const ConstTensorPin cellToOutputWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 11, true));
+    // 12: The input gate bias: Optional. A 1-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape [num_units].
+    const ConstTensorPin inputGateBiasPin =
+                             ConvertOperationInputToConstTensorPin<HalPolicy>(operation,
+                                                                              12,
+                                                                              model,
+                                                                              data,
+                                                                              g_DontPermute,
+                                                                              nullptr,
+                                                                              true);
+
+    // 16: The projection weights: Optional. A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape
+    //     [output_size, num_units].
+    const ConstTensorPin projectionWeightsPin =
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 16, true));
+    // 17: The projection bias: Optional. A 1-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16, of shape [output_size].
+    const ConstTensorPin projectionBiasPin =
+                             ConvertOperationInputToConstTensorPin<HalPolicy>(operation,
+                                                                              17,
+                                                                              model,
+                                                                              data,
+                                                                              g_DontPermute,
+                                                                              nullptr,
+                                                                              true);
+
+    if ((!inputToInputWeightsPin.IsValid() && !inputToInputWeightsPin.IsOptional()) ||
+        (!recurrentToInputWeightsPin.IsValid() && !recurrentToInputWeightsPin.IsOptional()) ||
+        (!cellToInputWeightsPin.IsValid() && !cellToInputWeightsPin.IsOptional()) ||
+        (!cellToForgetWeightsPin.IsValid() && !cellToForgetWeightsPin.IsOptional()) ||
+        (!cellToOutputWeightsPin.IsValid() && !cellToOutputWeightsPin.IsOptional()) ||
+        (!inputGateBiasPin.IsValid() && !inputGateBiasPin.IsOptional()) ||
+        (!projectionWeightsPin.IsValid() && !projectionWeightsPin.IsOptional()) ||
+        (!projectionBiasPin.IsValid() && !projectionBiasPin.IsOptional()))
+    {
+        return Fail("%s: Operation has invalid tensor inputs", __func__);
+    }
+
+    // Get the mandatory input scalars (actually 1-D tensors of size 1):
+    // 20: The activation function: A value indicating the activation function:
+    //     0: None; 1: Relu; 3: Relu6; 4: Tanh; 6: Sigmoid.
+    // 21: The clipping threshold: for the cell state, such that values are bound within [-cell_clip, cell_clip].
+    //     If set to 0.0 then clipping is disabled.
+    // 22: The clipping threshold: for the output from the projection layer, such that values are bound within
+    //     [-proj_clip, proj_clip]. If set to 0.0 then clipping is disabled.
+    // Determine data type of input tensor
+    ActivationFn activation = ActivationFn::kActivationNone;
+    LstmDescriptor desc;
+
+    if (inputType == HalOperandType::TENSOR_FLOAT32)
+    {
+        float cellClip;
+        float projClip;
+
+        if (!GetInputActivationFunctionFromTensor<HalPolicy>(operation, 20, activation, model, data) ||
+            !GetInputScalar<HalPolicy>(operation, 21, HalOperandType::FLOAT32, cellClip, model, data) ||
+            !GetInputScalar<HalPolicy>(operation, 22, HalOperandType::FLOAT32, projClip, model, data))
+        {
+            return Fail("%s: Operation has invalid scalar inputs", __func__);
+        }
+
+        desc.m_ClippingThresCell = cellClip;
+        desc.m_ClippingThresProj = projClip;
+    }
+
+    if (inputType == HalOperandType::TENSOR_FLOAT16)
+    {
+        Half cellClip;
+        Half projClip;
+
+        if (!GetInputActivationFunctionFromTensor<HalPolicy>(operation, 20, activation, model, data) ||
+            !GetInputScalar<HalPolicy>(operation, 21, HalOperandType::FLOAT16, cellClip, model, data) ||
+            !GetInputScalar<HalPolicy>(operation, 22, HalOperandType::FLOAT16, projClip, model, data))
+        {
+            return Fail("%s: Operation has invalid scalar inputs", __func__);
+        }
+
+        desc.m_ClippingThresCell = cellClip;
+        desc.m_ClippingThresProj = projClip;
+    }
+
+    // Determine if time-major or batch-major.
+    // 23: Time-major if true, batch-major if false.
+    bool isTimeMajor = GetOptionalBool<HalPolicy>(operation, 23, model, data);
+
+    // Get the normalization tensors
+    // 24: The input layer normalization weights. A 1-D tensor of shape [num_units].
+    //     Used to rescale normalized inputs to activation at input gate.
+    const ConstTensorPin inputLayerNormWeightsPin
+                             (DequantizeAndMakeConstTensorPin<HalPolicy>(operation, model, data, 24, true));
+
+    // 25: The forget layer normalization weights. A 1-D tensor of shape [num_units].
+    //     Used to rescale normalized inputs to activation at forget gate.
+    const ConstTensorPin forgetLayerNormWeightsPin =
+                             ConvertOperationInputToConstTensorPin<HalPolicy>(operation,
+                                                                              25,
+                                                                              model,
+                                                                              data,
+                                                                              g_DontPermute,
+                                                                              nullptr,
+                                                                              true);
+
+    // 26: The cell layer normalization weights. A 1-D tensor of shape [num_units].
+    //     Used to rescale normalized inputs to activation at cell gate.
+    const ConstTensorPin cellLayerNormWeightsPin =
+                             ConvertOperationInputToConstTensorPin<HalPolicy>(operation,
+                                                                              26,
+                                                                              model,
+                                                                              data,
+                                                                              g_DontPermute,
+                                                                              nullptr,
+                                                                              true);
+
+    // 27: The output layer normalization weights. A 1-D tensor of shape [num_units].
+    //     Used to rescale normalized inputs to activation at output gate.
+    const ConstTensorPin outputLayerNormWeightsPin =
+                             ConvertOperationInputToConstTensorPin<HalPolicy>(operation,
+                                                                              27,
+                                                                              model,
+                                                                              data,
+                                                                              g_DontPermute,
+                                                                              nullptr,
+                                                                              true);
+
+    // Outputs:
+    // 00: The output: A 2-D tensor of ANEURALNETWORKS_TENSOR_FLOAT32/16. Shape:  if time-major:
+    // [max_time, batch_size, output_size] If batch-major: [batch_size, max_time, output_size]
+    const HalOperand* output = GetOutputOperand<HalPolicy>(operation, 0, model);
+    if (!output)
+    {
+        return Fail("%s: Could not read output: ", __func__);
+    }
+
+    //
+    // 01 & 02: 
+    // hiddenStateOut and cellStateOut are not currently supported by our android versioning.
+    //
+
+    // set the params structure for the AddLstmLayer call
+    LstmInputParams params;
+    params.m_InputToInputWeights = inputToInputWeightsPin.GetConstTensorPtr();
+    params.m_InputToForgetWeights = inputToForgetWeightsPin.GetConstTensorPtr();
+    params.m_InputToCellWeights = inputToCellWeightsPin.GetConstTensorPtr();
+    params.m_InputToOutputWeights = inputToOutputWeightsPin.GetConstTensorPtr();
+    params.m_RecurrentToInputWeights = recurrentToInputWeightsPin.GetConstTensorPtr();
+    params.m_RecurrentToForgetWeights = recurrentToForgetWeightsPin.GetConstTensorPtr();
+    params.m_RecurrentToCellWeights = recurrentToCellWeightsPin.GetConstTensorPtr();
+    params.m_RecurrentToOutputWeights = recurrentToOutputWeightsPin.GetConstTensorPtr();
+    params.m_CellToInputWeights = cellToInputWeightsPin.GetConstTensorPtr();
+    params.m_CellToForgetWeights = cellToForgetWeightsPin.GetConstTensorPtr();
+    params.m_CellToOutputWeights = cellToOutputWeightsPin.GetConstTensorPtr();
+    params.m_InputGateBias = inputGateBiasPin.GetConstTensorPtr();
+    params.m_ForgetGateBias = forgetGateBiasPin.GetConstTensorPtr();
+    params.m_CellBias = cellBiasPin.GetConstTensorPtr();
+    params.m_OutputGateBias = outputGateBiasPin.GetConstTensorPtr();
+    params.m_ProjectionWeights = projectionWeightsPin.GetConstTensorPtr();
+    params.m_ProjectionBias = projectionBiasPin.GetConstTensorPtr();
+    params.m_InputLayerNormWeights = inputLayerNormWeightsPin.GetConstTensorPtr();
+    params.m_ForgetLayerNormWeights = forgetLayerNormWeightsPin.GetConstTensorPtr();
+    params.m_CellLayerNormWeights = cellLayerNormWeightsPin.GetConstTensorPtr();
+    params.m_OutputLayerNormWeights = outputLayerNormWeightsPin.GetConstTensorPtr();
+
+    // set the layer descriptor
+    desc.m_ActivationFunc = activation;
+    desc.m_CifgEnabled = (params.m_InputToInputWeights == nullptr ||
+        params.m_RecurrentToInputWeights == nullptr ||
+        params.m_InputGateBias == nullptr);
+    desc.m_PeepholeEnabled = (params.m_CellToForgetWeights != nullptr ||
+        params.m_CellToOutputWeights != nullptr);
+    desc.m_ProjectionEnabled = (params.m_ProjectionWeights != nullptr);
+    desc.m_LayerNormEnabled = (params.m_InputLayerNormWeights != nullptr ||
+        params.m_ForgetLayerNormWeights != nullptr ||
+        params.m_CellLayerNormWeights != nullptr ||
+        params.m_OutputLayerNormWeights != nullptr);
+    desc.m_TimeMajor = isTimeMajor;
+
+    // validate the optional input groups
+    if (desc.m_CifgEnabled &&
+        (params.m_InputToInputWeights != nullptr ||
+            params.m_RecurrentToInputWeights != nullptr ||
+            params.m_InputGateBias != nullptr))
+    {
+        return Fail("%s: All, or none, of input-to-input weights, recurrent-to-input weights,"
+                    " and input gate bias must be provided", __func__);
+    }
+
+    if (!desc.m_ProjectionEnabled && params.m_ProjectionBias != nullptr)
+    {
+        return Fail("%s: projection bias should not be provided without projection weights", __func__);
+    }
+
+    if (desc.m_PeepholeEnabled &&
+        (params.m_CellToForgetWeights == nullptr ||
+            params.m_CellToOutputWeights == nullptr ||
+            (!desc.m_CifgEnabled && params.m_CellToInputWeights == nullptr)))
+    {
+        return Fail("%s: All, or none, of cell-to-forget weights and cell-to-output weights must be provided"
+                    " and, if CIFG is not enabled, cell-to-input weights must also be provided", __func__);
+    }
+
+    if (desc.m_LayerNormEnabled &&
+        (params.m_ForgetLayerNormWeights == nullptr ||
+            params.m_CellLayerNormWeights == nullptr ||
+            params.m_OutputLayerNormWeights == nullptr ||
+            (!desc.m_CifgEnabled && params.m_InputLayerNormWeights == nullptr)))
+    {
+        return Fail("%s: All, or none, of forget-norm weights, cell-norm weights and output-norm weights must be"
+                    " provided and, if CIFG is not enabled, input-norm weights must also be provided", __func__);
+    }
+
+    // Check if the layer is supported
+    // Inputs
+    const TensorInfo& inputInfo         = input.GetTensorInfo();
+    const TensorInfo& outputStateInInfo = outputStateIn.GetTensorInfo();
+    const TensorInfo& cellStateInInfo   = cellStateIn.GetTensorInfo();
+
+    // Outputs
+    const TensorInfo& outputInfo         = GetTensorInfoForOperand(*output);
+
+    unsigned int batchSize               = inputInfo.GetShape()[0];
+    unsigned int outputSize              = outputInfo.GetShape()[2];
+    unsigned int numUnits                = cellStateInInfo.GetShape()[1];
+
+    armnn::DataType dataType             = inputInfo.GetDataType();
+    float qScale                         = inputInfo.GetQuantizationScale();
+    int qOffset                          = inputInfo.GetQuantizationOffset();
+
+    armnn::TensorInfo cellStateOutInfo({batchSize, numUnits}, cellStateInInfo.GetDataType(),
+                                       cellStateInInfo.GetQuantizationScale(), cellStateInInfo.GetQuantizationOffset());
+    armnn::TensorInfo outputStateOutInfo({batchSize, outputSize}, dataType, qScale, qOffset);
+
+    // Basic parameters
+    LstmInputParamsInfo paramsInfo;
+    paramsInfo.m_InputToForgetWeights     = &(params.m_InputToForgetWeights->GetInfo());
+    paramsInfo.m_InputToCellWeights       = &(params.m_InputToCellWeights->GetInfo());
+    paramsInfo.m_InputToOutputWeights     = &(params.m_InputToOutputWeights->GetInfo());
+    paramsInfo.m_RecurrentToForgetWeights = &(params.m_RecurrentToForgetWeights->GetInfo());
+    paramsInfo.m_RecurrentToCellWeights   = &(params.m_RecurrentToCellWeights->GetInfo());
+    paramsInfo.m_RecurrentToOutputWeights = &(params.m_RecurrentToOutputWeights->GetInfo());
+    paramsInfo.m_ForgetGateBias           = &(params.m_ForgetGateBias->GetInfo());
+    paramsInfo.m_CellBias                 = &(params.m_CellBias->GetInfo());
+    paramsInfo.m_OutputGateBias           = &(params.m_OutputGateBias->GetInfo());
+
+    // Optional parameters
+    if (!desc.m_CifgEnabled)
+    {
+        paramsInfo.m_InputToInputWeights = &(params.m_InputToInputWeights->GetInfo());
+        paramsInfo.m_RecurrentToInputWeights = &(params.m_RecurrentToInputWeights->GetInfo());
+        if (params.m_CellToInputWeights != nullptr)
+        {
+            paramsInfo.m_CellToInputWeights = &(params.m_CellToInputWeights->GetInfo());
+        }
+        paramsInfo.m_InputGateBias = &(params.m_InputGateBias->GetInfo());
+    }
+
+    if (desc.m_ProjectionEnabled)
+    {
+        paramsInfo.m_ProjectionWeights = &(params.m_ProjectionWeights->GetInfo());
+        if (params.m_ProjectionBias != nullptr)
+        {
+            paramsInfo.m_ProjectionBias = &(params.m_ProjectionBias->GetInfo());
+        }
+    }
+
+    if (desc.m_PeepholeEnabled)
+    {
+        paramsInfo.m_CellToForgetWeights = &(params.m_CellToForgetWeights->GetInfo());
+        paramsInfo.m_CellToOutputWeights = &(params.m_CellToOutputWeights->GetInfo());
+    }
+
+    if (desc.m_LayerNormEnabled)
+    {
+        if(!desc.m_CifgEnabled)
+        {
+            paramsInfo.m_InputLayerNormWeights = &(params.m_InputLayerNormWeights->GetInfo());
+        }
+        paramsInfo.m_ForgetLayerNormWeights = &(params.m_ForgetLayerNormWeights->GetInfo());
+        paramsInfo.m_CellLayerNormWeights = &(params.m_CellLayerNormWeights->GetInfo());
+        paramsInfo.m_OutputLayerNormWeights = &(params.m_OutputLayerNormWeights->GetInfo());
+    }
+
+    bool isSupported = false;
+    armnn::BackendId setBackend;
+    auto validateFunc = [&](const armnn::TensorInfo& outputInfo, bool& isSupported)
+    {
+        FORWARD_LAYER_SUPPORT_FUNC(__func__,
+                                   IsUnidirectionalSequenceLstmSupported,
+                                   data.m_Backends,
+                                   isSupported,
+                                   setBackend,
+                                   inputInfo,
+                                   outputStateInInfo,
+                                   cellStateInInfo,
+                                   outputStateOutInfo,
+                                   cellStateOutInfo,
+                                   outputInfo,
+                                   desc,
+                                   paramsInfo);
+    };
+
+    bool isDynamic = false;
+    if (!IsDynamicTensor(outputInfo))
+    {
+        validateFunc(outputInfo, isSupported);
+    }
+    else
+    {
+        isDynamic = true;
+        isSupported = AreDynamicTensorsSupported();
+    }
+
+    if (!isSupported)
+    {
+        return false;
+    }
+
+    // Add the layer
+    IConnectableLayer* layer = data.m_Network->AddUnidirectionalSequenceLstmLayer(desc,
+                                                                                  params,
+                                                                                  "UnidirectionalSequenceLstm");
+    layer->SetBackendId(setBackend);
+
+    input.Connect(layer->GetInputSlot(0));
+    outputStateIn.Connect(layer->GetInputSlot(1));
+    cellStateIn.Connect(layer->GetInputSlot(2));
+
+    if (!isDynamic)
+    {
+        return (SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, 2, model, data));
+    }
+    else
+    {
+        return (SetupAndTrackLayerOutputSlot<HalPolicy>(operation, 0, *layer, 2, model, data, nullptr,
+                                                        validateFunc, ActivationFn::kActivationNone, true));
+    }
 }
 
 } // armnn_driver namespace

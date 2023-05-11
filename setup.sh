@@ -1,5 +1,10 @@
 #!/bin/bash
 
+#
+# Copyright © 2018, 2020-022 Arm Ltd and Contributors. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+
 function AssertZeroExitCode {
   EXITCODE=$?
   if [ $EXITCODE -ne 0 ]; then
@@ -9,21 +14,45 @@ function AssertZeroExitCode {
   fi
 }
 
-if [ ! -d boost_1_64_0 ]; then
-  echo "++ Downloading Boost"
+BUILD_DIR=build-x86_64
+FLATBUFFERS_DIR=$PWD/flatbuffers
 
-  BOOST_PKG=boost_1_64_0.tar.gz
+function BuildFlatbuffers {
+  pushd flatbuffers
+  rm -rf $BUILD_DIR
+  rm -f CMakeCache.txt
+  FLATBUFFERS_DIR=$PWD
 
-  # There is a problem with downloading boost from the external. Issue can be found here:https://github.com/boostorg/boost/issues/299.
-  # Using a mirror link to download boost.
-  curl -LOk https://dl.bintray.com/boostorg/release/1.64.0/source/boost_1_64_0.tar.gz
-  # curl -LOk https://sourceforge.net/projects/boost/files/boost/1.64.0/boost_1_64_0.tar.gz # had switched to this mirror as we were not able to download boost from boostorg.
-  AssertZeroExitCode "Downloading Boost failed"
+  mkdir -p $BUILD_DIR
+  cd $BUILD_DIR
 
-  tar xzf $BOOST_PKG
-  AssertZeroExitCode "Unpacking Boost failed"
+  echo "+++ Building Google Flatbufers"
+  CMD="cmake -DFLATBUFFERS_BUILD_FLATC=1 -DCMAKE_INSTALL_PREFIX:PATH=$FLATBUFFERS_DIR .."
+  # Force -fPIC to allow relocatable linking.
+  CXXFLAGS="-fPIC" $CMD
+  AssertZeroExitCode "cmake Google Flatbuffers failed. command was: ${CMD}"
+  make all install
+  AssertZeroExitCode "Building Google Flatbuffers failed"
+  mkdir -p $FLATBUFFERS_DIR/bin
+  cp -f flatc $FLATBUFFERS_DIR/bin
+  AssertZeroExitCode "Failed to copy the Flatbuffers Compiler"
+  popd
+}
 
-  rm -rf $BOOST_PKG
+if [ ! -d flatbuffers ]; then
+  echo "++ Downloading FlatBuffers v2.0.6"
+
+  FLATBUFFERS_PKG=v2.0.6.tar.gz
+
+  curl -LOk https://github.com/google/flatbuffers/archive/${FLATBUFFERS_PKG}
+  AssertZeroExitCode "Downloading FlatBuffers failed"
+  mkdir -p flatbuffers
+  tar xzf $FLATBUFFERS_PKG -C flatbuffers --strip-components 1
+  AssertZeroExitCode "Unpacking FlatBuffers failed"
+
+  BuildFlatbuffers
+
+  rm -rf $FLATBUFFERS_PKG
 fi
 
 if [ ! -d armnn ]; then
@@ -44,8 +73,22 @@ fi
 # This is required for the Android build system to build clframework (see below)
 pushd clframework
 scons os=android build=embed_only neon=0 opencl=1 embed_kernels=1 validation_tests=0 \
+    arch=arm64-v8.2-a build_dir=android-arm64v8.2-a benchmark_tests=0 -j16 \
+    build/android-arm64v8.2-a/src/core/arm_compute_version.embed build/android-arm64v8.2-a/src/core/CL/cl_kernels
+AssertZeroExitCode "Precompiling clframework failed for v82.a"
+
+scons os=android build=embed_only neon=0 opencl=1 embed_kernels=1 validation_tests=0 \
     arch=arm64-v8a build_dir=android-arm64v8a benchmark_tests=0 -j16 \
     build/android-arm64v8a/src/core/arm_compute_version.embed build/android-arm64v8a/src/core/CL/cl_kernels
-AssertZeroExitCode "Precompiling clframework failed"
+AssertZeroExitCode "Precompiling clframework failed for v8a."
 popd
 
+if [ ! -d armnn/generated ]; then
+  mkdir -p armnn/generated
+fi
+
+if [ ! -f armnn/generated/ArmnnSchema_generated.h ]; then
+  echo "+++ Generating new ArmnnSchema_generated.h"
+  $FLATBUFFERS_DIR/bin/flatc -o armnn/generated --cpp armnn/src/armnnSerializer/ArmnnSchema.fbs
+  AssertZeroExitCode "Generating ArmnnSchema_generated.h failed."
+fi

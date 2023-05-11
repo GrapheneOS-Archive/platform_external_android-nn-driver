@@ -1,5 +1,5 @@
 //
-// Copyright © 2020 Arm Ltd. All rights reserved.
+// Copyright © 2020-2023 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -24,7 +24,7 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
         case V1_3::OperationType::ABS:
             return ConvertElementwiseUnary(operation, model, data, UnaryOperation::Abs);
         case V1_3::OperationType::ADD:
-            return ConvertAdd(operation, model, data);
+            return ConvertElementwiseBinary(operation, model, data, BinaryOperation::Add);
         case V1_3::OperationType::ARGMAX:
             return ConvertArgMinMax(operation, model, data, ArgMinMaxFunction::Max);
         case V1_3::OperationType::ARGMIN:
@@ -33,6 +33,10 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
             return ConvertAveragePool2d(operation, model, data);
         case V1_3::OperationType::BATCH_TO_SPACE_ND:
             return ConvertBatchToSpaceNd(operation, model, data);
+        case V1_3::OperationType::CAST:
+            return ConvertCast(operation, model, data);
+        case V1_3::OperationType::CHANNEL_SHUFFLE:
+            return ConvertChannelShuffle(operation, model, data);
         case V1_3::OperationType::CONCATENATION:
             return ConvertConcatenation(operation, model, data);
         case V1_3::OperationType::CONV_2D:
@@ -44,7 +48,7 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
         case V1_3::OperationType::DEQUANTIZE:
             return ConvertDequantize(operation, model, data);
         case V1_3::OperationType::DIV:
-            return ConvertDiv(operation, model, data);
+            return ConvertElementwiseBinary(operation, model, data, BinaryOperation::Div);
         case V1_3::OperationType::ELU:
             return ConvertElu(operation, model, data);
         case V1_3::OperationType::EQUAL:
@@ -81,6 +85,14 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
             return ConvertComparison(operation, model, data, ComparisonOperation::LessOrEqual);
         case V1_3::OperationType::LOCAL_RESPONSE_NORMALIZATION:
             return ConvertLocalResponseNormalization(operation, model, data);
+        case V1_3::OperationType::LOG:
+            return ConvertElementwiseUnary(operation, model, data, UnaryOperation::Log);
+        case V1_3::OperationType::LOGICAL_AND:
+            return ConvertLogicalBinary(operation, model, data, LogicalBinaryOperation::LogicalAnd);
+        case V1_3::OperationType::LOGICAL_NOT:
+            return ConvertElementwiseUnary(operation, model, data, UnaryOperation::LogicalNot);
+        case V1_3::OperationType::LOGICAL_OR:
+            return ConvertLogicalBinary(operation, model, data, LogicalBinaryOperation::LogicalOr);
         case V1_3::OperationType::LOGISTIC:
             return ConvertLogistic(operation, model, data);
         case V1_3::OperationType::LOG_SOFTMAX:
@@ -90,13 +102,13 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
         case V1_3::OperationType::MAX_POOL_2D:
             return ConvertMaxPool2d(operation, model, data);
         case V1_3::OperationType::MAXIMUM:
-            return ConvertMaximum(operation, model, data);
+            return ConvertElementwiseBinary(operation, model, data, BinaryOperation::Maximum);
         case V1_3::OperationType::MEAN:
             return ConvertMean(operation, model, data);
         case V1_3::OperationType::MINIMUM:
-            return ConvertMinimum(operation, model, data);
+            return ConvertElementwiseBinary(operation, model, data, BinaryOperation::Minimum);
         case V1_3::OperationType::MUL:
-            return ConvertMul(operation, model, data);
+            return ConvertElementwiseBinary(operation, model, data, BinaryOperation::Mul);
         case V1_3::OperationType::NEG:
             return ConvertElementwiseUnary(operation, model, data, UnaryOperation::Neg);
         case V1_3::OperationType::NOT_EQUAL:
@@ -115,6 +127,14 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
             return ConvertQuantized16BitLstm(operation, model, data);
         case V1_3::OperationType::RANK:
             return ConvertRank(operation, model, data);
+        case V1_3::OperationType::REDUCE_MAX:
+            return ConvertReduce(operation, model, data, ReduceOperation::Max);
+        case V1_3::OperationType::REDUCE_MIN:
+            return ConvertReduce(operation, model, data, ReduceOperation::Min);
+        case V1_3::OperationType::REDUCE_PROD:
+            return ConvertReduce(operation, model, data, ReduceOperation::Prod);
+        case V1_3::OperationType::REDUCE_SUM:
+            return ConvertReduce(operation, model, data, ReduceOperation::Sum);
         case V1_3::OperationType::RELU:
             return ConvertReLu(operation, model, data);
         case V1_3::OperationType::RELU1:
@@ -129,36 +149,34 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
             return ConvertResize(operation, model, data, ResizeMethod::NearestNeighbor);
         case V1_3::OperationType::RSQRT:
             return ConvertElementwiseUnary(operation, model, data, UnaryOperation::Rsqrt);
-        case V1_3::OperationType::SQRT:
-            return ConvertSqrt(operation, model, data);
-        case V1_3::OperationType::SQUEEZE:
-            return ConvertSqueeze(operation, model, data);
-        case V1_3::OperationType::STRIDED_SLICE:
-            return ConvertStridedSlice(operation, model, data);
-        case V1_3::OperationType::TRANSPOSE:
-            return ConvertTranspose(operation, model, data);
-        case V1_3::OperationType::TRANSPOSE_CONV_2D:
-            return ConvertTransposeConv2d(operation, model, data);
+        case V1_3::OperationType::SIN:
+            return ConvertElementwiseUnary(operation, model, data, UnaryOperation::Sin);
         case V1_3::OperationType::SOFTMAX:
             return ConvertSoftmax(operation, model, data);
         case V1_3::OperationType::SPACE_TO_BATCH_ND  :
             return ConvertSpaceToBatchNd(operation, model, data);
         case V1_3::OperationType::SPACE_TO_DEPTH:
             return ConvertSpaceToDepth(operation, model, data);
+        case V1_3::OperationType::SQRT:
+            return ConvertSqrt(operation, model, data);
+        case V1_3::OperationType::SQUEEZE:
+            return ConvertSqueeze(operation, model, data);
+        case V1_3::OperationType::STRIDED_SLICE:
+            return ConvertStridedSlice(operation, model, data);
         case V1_3::OperationType::SUB:
-            return ConvertSub(operation, model, data);
+            return ConvertElementwiseBinary(operation, model, data, BinaryOperation::Sub);
+        case V1_3::OperationType::TRANSPOSE:
+            return ConvertTranspose(operation, model, data);
+        case V1_3::OperationType::TRANSPOSE_CONV_2D:
+            return ConvertTransposeConv2d(operation, model, data);
         case V1_3::OperationType::TANH:
             return ConvertTanH(operation, model, data);
+        case V1_3::OperationType::UNIDIRECTIONAL_SEQUENCE_LSTM:
+            return ConvertUnidirectionalSequenceLstm(operation, model, data);
         default:
             return Fail("%s: Operation type %s not supported in ArmnnDriver",
                         __func__, toString(operation.type).c_str());
     }
-}
-
-bool HalPolicy::ConvertAdd(const Operation& operation, const Model& model, ConversionData& data)
-{
-    ALOGV("hal_1_3::HalPolicy::ConvertAdd()");
-    return ::ConvertAdd<hal_1_3::HalPolicy>(operation, model, data);
 }
 
 bool HalPolicy::ConvertArgMinMax(const V1_3::Operation& operation,
@@ -182,6 +200,18 @@ bool HalPolicy::ConvertBatchToSpaceNd(const Operation& operation, const Model& m
     return ::ConvertBatchToSpaceNd<hal_1_3::HalPolicy>(operation, model, data);
 }
 
+bool HalPolicy::ConvertCast(const Operation& operation, const Model& model, ConversionData& data)
+{
+    ALOGV("hal_1_3::HalPolicy::ConvertCast()");
+    return ::ConvertCast<hal_1_3::HalPolicy>(operation, model, data);
+}
+
+bool HalPolicy::ConvertChannelShuffle(const Operation& operation, const Model& model, ConversionData& data)
+{
+    ALOGV("hal_1_3::HalPolicy::ConvertChannelShuffle()");
+    return ::ConvertChannelShuffle<hal_1_3::HalPolicy>(operation, model, data);
+}
+
 bool HalPolicy::ConvertComparison(const Operation& operation,
                                   const Model& model,
                                   ConversionData& data,
@@ -190,7 +220,6 @@ bool HalPolicy::ConvertComparison(const Operation& operation,
     ALOGV("hal_1_3::HalPolicy::ConvertComparison()");
     return ::ConvertComparison_1_2<hal_1_3::HalPolicy>(operation, model, data, comparisonOperation);
 }
-
 
 bool HalPolicy::ConvertConcatenation(const Operation& operation, const Model& model, ConversionData& data)
 {
@@ -222,10 +251,13 @@ bool HalPolicy::ConvertDequantize(const Operation& operation, const Model& model
     return ::ConvertDequantize_1_2<hal_1_3::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertDiv(const Operation& operation, const Model& model, ConversionData& data)
+bool HalPolicy::ConvertElementwiseBinary(const Operation& operation,
+                                         const Model& model,
+                                         ConversionData& data,
+                                         BinaryOperation binaryOperation)
 {
-    ALOGV("hal_1_3::HalPolicy::ConvertDiv()");
-    return ::ConvertDiv<hal_1_3::HalPolicy>(operation, model, data);
+    ALOGV("hal_1_3::HalPolicy::ConvertElementwiseBinary()");
+    return ::ConvertElementwiseBinary<hal_1_3::HalPolicy>(operation, model, data, binaryOperation);
 }
 
 bool HalPolicy::ConvertElementwiseUnary(const Operation& operation,
@@ -314,6 +346,15 @@ bool HalPolicy::ConvertLocalResponseNormalization(const Operation& operation,
     return ::ConvertLocalResponseNormalization<hal_1_3::HalPolicy>(operation, model, data);
 }
 
+bool HalPolicy::ConvertLogicalBinary(const Operation& operation,
+                                     const Model& model,
+                                     ConversionData& data,
+                                     armnn::LogicalBinaryOperation logicalOperation)
+{
+    ALOGV("hal_1_3::HalPolicy::ConvertLogicalBinary()");
+    return ::ConvertLogicalBinary<hal_1_3::HalPolicy>(operation, model, data, logicalOperation);
+}
+
 bool HalPolicy::ConvertLogistic(const Operation& operation, const Model& model, ConversionData& data)
 {
     ALOGV("hal_1_3::HalPolicy::ConvertLogistic()");
@@ -338,28 +379,10 @@ bool HalPolicy::ConvertMaxPool2d(const Operation& operation, const Model& model,
     return ConvertPooling2d<hal_1_3::HalPolicy>(operation, __func__, PoolingAlgorithm::Max, model, data);
 }
 
-bool HalPolicy::ConvertMaximum(const Operation& operation, const Model& model, ConversionData& data)
-{
-    ALOGV("hal_1_3::HalPolicy::ConvertMaximum()");
-    return ::ConvertMaximum<hal_1_3::HalPolicy>(operation, model, data);
-}
-
 bool HalPolicy::ConvertMean(const Operation& operation, const Model& model, ConversionData& data)
 {
     ALOGV("hal_1_3::HalPolicy::ConvertMean()");
     return ::ConvertMean<hal_1_3::HalPolicy>(operation, model, data);
-}
-
-bool HalPolicy::ConvertMinimum(const Operation& operation, const Model& model, ConversionData& data)
-{
-    ALOGV("hal_1_3::HalPolicy::ConvertMinimum()");
-    return ::ConvertMinimum<hal_1_3::HalPolicy>(operation, model, data);
-}
-
-bool HalPolicy::ConvertMul(const Operation& operation, const Model& model, ConversionData& data)
-{
-    ALOGV("hal_1_3::HalPolicy::ConvertMul()");
-    return ::ConvertMul<hal_1_3::HalPolicy>(operation, model, data);
 }
 
 bool HalPolicy::ConvertPad(const Operation& operation, const Model& model, ConversionData& data)
@@ -402,6 +425,15 @@ bool HalPolicy::ConvertRank(const Operation& operation, const Model& model, Conv
 {
     ALOGV("hal_1_3::HalPolicy::ConvertRank()");
     return ::ConvertRank<hal_1_3::HalPolicy>(operation, model, data);
+}
+
+bool HalPolicy::ConvertReduce(const Operation& operation,
+                              const Model& model,
+                              ConversionData& data,
+                              ReduceOperation reduceOperation)
+{
+    ALOGV("hal_1_3::HalPolicy::ConvertReduce()");
+    return ::ConvertReduce<hal_1_3::HalPolicy>(operation, model, data, reduceOperation);
 }
 
 bool HalPolicy::ConvertReLu(const Operation& operation, const Model& model, ConversionData& data)
@@ -455,12 +487,6 @@ bool HalPolicy::ConvertSoftmax(const Operation& operation, const Model& model, C
     return ::ConvertSoftmax<hal_1_3::HalPolicy>(operation, model, data);
 }
 
-bool HalPolicy::ConvertSub(const Operation& operation, const Model& model, ConversionData& data)
-{
-    ALOGV("hal_1_3::HalPolicy::ConvertSub()");
-    return ::ConvertSub<hal_1_3::HalPolicy>(operation, model, data);
-}
-
 bool HalPolicy::ConvertTanH(const Operation& operation, const Model& model, ConversionData& data)
 {
     ALOGV("hal_1_3::HalPolicy::ConvertTanH()");
@@ -498,6 +524,12 @@ bool HalPolicy::ConvertTranspose(const Operation& operation, const Model& model,
 {
     ALOGV("hal_1_3::HalPolicy::ConvertTranspose()");
     return ::ConvertTranspose<hal_1_3::HalPolicy>(operation, model, data);
+}
+
+bool HalPolicy::ConvertUnidirectionalSequenceLstm(const Operation& operation, const Model& model, ConversionData& data)
+{
+    ALOGV("hal_1_3::HalPolicy::ConvertUnidirectionalSequenceLstm()");
+    return ::ConvertUnidirectionalSequenceLstm<hal_1_3::HalPolicy>(operation, model, data);
 }
 
 } // namespace hal_1_3

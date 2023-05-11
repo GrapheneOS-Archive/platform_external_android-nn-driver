@@ -1,38 +1,27 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
-#include "OperationsUtils.h"
 
 #include "../DriverTestHelpers.hpp"
 #include "../TestTensor.hpp"
-
-#include "../1.1/HalPolicy.hpp"
-
-#include <boost/test/unit_test.hpp>
-#include <boost/test/data/test_case.hpp>
+#include <1.1/HalPolicy.hpp>
 
 #include <log/log.h>
+#include <OperationsUtils.h>
 
 #include <array>
 #include <cmath>
-
-BOOST_AUTO_TEST_SUITE(TransposeTests)
 
 using namespace android::hardware;
 using namespace driverTestHelpers;
 using namespace armnn_driver;
 
 using HalPolicy = hal_1_1::HalPolicy;
+using RequestArgument = V1_0::RequestArgument;
 
 namespace
 {
-
-#ifndef ARMCOMPUTECL_ENABLED
-    static const std::array<armnn::Compute, 1> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef }};
-#else
-    static const std::array<armnn::Compute, 2> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef, armnn::Compute::GpuAcc }};
-#endif
 
 void TransposeTestImpl(const TestTensor & inputs, int32_t perm[],
                        const TestTensor & expectedOutputTensor, armnn::Compute computeDevice)
@@ -58,22 +47,22 @@ void TransposeTestImpl(const TestTensor & inputs, int32_t perm[],
 
     // the request's memory pools will follow the same order as
     // the inputs
-    DataLocation inloc = {};
-    inloc.poolIndex = 0;
-    inloc.offset = 0;
-    inloc.length = inputs.GetNumElements() * sizeof(float);
-    RequestArgument input = {};
-    input.location = inloc;
-    input.dimensions = inputs.GetDimensions();
+    V1_0::DataLocation inloc = {};
+    inloc.poolIndex          = 0;
+    inloc.offset             = 0;
+    inloc.length             = inputs.GetNumElements() * sizeof(float);
+    RequestArgument input    = {};
+    input.location           = inloc;
+    input.dimensions         = inputs.GetDimensions();
 
     // and an additional memory pool is needed for the output
-    DataLocation outloc = {};
-    outloc.poolIndex = 1;
-    outloc.offset = 0;
-    outloc.length = expectedOutputTensor.GetNumElements() * sizeof(float);
-    RequestArgument output = {};
-    output.location = outloc;
-    output.dimensions = expectedOutputTensor.GetDimensions();
+    V1_0::DataLocation outloc = {};
+    outloc.poolIndex          = 1;
+    outloc.offset             = 0;
+    outloc.length             = expectedOutputTensor.GetNumElements() * sizeof(float);
+    RequestArgument output    = {};
+    output.location           = outloc;
+    output.dimensions         = expectedOutputTensor.GetDimensions();
 
     // make the request based on the arguments
     V1_0::Request request = {};
@@ -97,38 +86,100 @@ void TransposeTestImpl(const TestTensor & inputs, int32_t perm[],
     const float * expectedOutput = expectedOutputTensor.GetData();
     for (unsigned int i = 0; i < expectedOutputTensor.GetNumElements(); ++i)
     {
-        BOOST_TEST(outdata[i] == expectedOutput[i]);
+        DOCTEST_CHECK(outdata[i] == expectedOutput[i]);
     }
 }
 
 } // namespace
 
-BOOST_DATA_TEST_CASE(Transpose , COMPUTE_DEVICES)
+DOCTEST_TEST_SUITE("TransposeTests_CpuRef")
 {
-    int32_t perm[] = {2, 3, 1, 0};
-    TestTensor input{armnn::TensorShape{1, 2, 2, 2},{1, 2, 3, 4, 5, 6, 7, 8}};
-    TestTensor expected{armnn::TensorShape{2, 2, 2, 1},{1, 5, 2, 6, 3, 7, 4, 8}};
+    DOCTEST_TEST_CASE("Transpose_CpuRef")
+    {
+        int32_t perm[] = {2, 3, 1, 0};
+        TestTensor input{armnn::TensorShape{1, 2, 2, 2},{1, 2, 3, 4, 5, 6, 7, 8}};
+        TestTensor expected{armnn::TensorShape{2, 2, 2, 1},{1, 5, 2, 6, 3, 7, 4, 8}};
 
-    TransposeTestImpl(input, perm, expected, sample);
+        TransposeTestImpl(input, perm, expected, armnn::Compute::CpuRef);
+    }
+
+    DOCTEST_TEST_CASE("TransposeNHWCToArmNN_CpuRef")
+    {
+        int32_t perm[] = {0, 3, 1, 2};
+        TestTensor input{armnn::TensorShape{1, 2, 2, 3},{1, 2, 3, 11, 12, 13, 21, 22, 23, 31, 32, 33}};
+        TestTensor expected{armnn::TensorShape{1, 3, 2, 2},{1, 11, 21, 31, 2, 12, 22, 32, 3, 13, 23, 33}};
+
+        TransposeTestImpl(input, perm, expected, armnn::Compute::CpuRef);
+    }
+    DOCTEST_TEST_CASE("TransposeArmNNToNHWC_CpuRef")
+    {
+        int32_t perm[] = {0, 2, 3, 1};
+        TestTensor input{armnn::TensorShape{1, 2, 2, 2},{1, 2, 3, 4, 5, 6, 7, 8}};
+        TestTensor expected{armnn::TensorShape{1, 2, 2, 2},{1, 5, 2, 6, 3, 7, 4, 8}};
+
+        TransposeTestImpl(input, perm, expected, armnn::Compute::CpuRef);
+    }
 }
 
-BOOST_DATA_TEST_CASE(TransposeNHWCToArmNN , COMPUTE_DEVICES)
+#ifdef ARMCOMPUTECL_ENABLED
+DOCTEST_TEST_SUITE("TransposeTests_CpuAcc")
 {
-    int32_t perm[] = {0, 3, 1, 2};
-    TestTensor input{armnn::TensorShape{1, 2, 2, 3},{1, 2, 3, 11, 12, 13, 21, 22, 23, 31, 32, 33}};
-    TestTensor expected{armnn::TensorShape{1, 3, 2, 2},{1, 11, 21, 31, 2, 12, 22, 32, 3, 13, 23, 33}};
+    DOCTEST_TEST_CASE("Transpose_CpuAcc")
+    {
+        int32_t perm[] = {2, 3, 1, 0};
+        TestTensor input{armnn::TensorShape{1, 2, 2, 2},{1, 2, 3, 4, 5, 6, 7, 8}};
+        TestTensor expected{armnn::TensorShape{2, 2, 2, 1},{1, 5, 2, 6, 3, 7, 4, 8}};
 
-    TransposeTestImpl(input, perm, expected, sample);
+        TransposeTestImpl(input, perm, expected, armnn::Compute::CpuAcc);
+    }
+
+    DOCTEST_TEST_CASE("TransposeNHWCToArmNN_CpuAcc")
+    {
+        int32_t perm[] = {0, 3, 1, 2};
+        TestTensor input{armnn::TensorShape{1, 2, 2, 3},{1, 2, 3, 11, 12, 13, 21, 22, 23, 31, 32, 33}};
+        TestTensor expected{armnn::TensorShape{1, 3, 2, 2},{1, 11, 21, 31, 2, 12, 22, 32, 3, 13, 23, 33}};
+
+        TransposeTestImpl(input, perm, expected, armnn::Compute::CpuAcc);
+    }
+
+    DOCTEST_TEST_CASE("TransposeArmNNToNHWC_CpuAcc")
+    {
+        int32_t perm[] = {0, 2, 3, 1};
+        TestTensor input{armnn::TensorShape{1, 2, 2, 2},{1, 2, 3, 4, 5, 6, 7, 8}};
+        TestTensor expected{armnn::TensorShape{1, 2, 2, 2},{1, 5, 2, 6, 3, 7, 4, 8}};
+
+        TransposeTestImpl(input, perm, expected, armnn::Compute::CpuAcc);
+    }
 }
 
-BOOST_DATA_TEST_CASE(TransposeArmNNToNHWC , COMPUTE_DEVICES)
+DOCTEST_TEST_SUITE("TransposeTests_GpuAcc")
 {
-    int32_t perm[] = {0, 2, 3, 1};
-    TestTensor input{armnn::TensorShape{1, 2, 2, 2},{1, 2, 3, 4, 5, 6, 7, 8}};
-    TestTensor expected{armnn::TensorShape{1, 2, 2, 2},{1, 5, 2, 6, 3, 7, 4, 8}};
+    DOCTEST_TEST_CASE("Transpose_GpuAcc")
+    {
+        int32_t perm[] = {2, 3, 1, 0};
+        TestTensor input{armnn::TensorShape{1, 2, 2, 2},{1, 2, 3, 4, 5, 6, 7, 8}};
+        TestTensor expected{armnn::TensorShape{2, 2, 2, 1},{1, 5, 2, 6, 3, 7, 4, 8}};
 
-    TransposeTestImpl(input, perm, expected, sample);
+        TransposeTestImpl(input, perm, expected, armnn::Compute::GpuAcc);
+    }
+
+    DOCTEST_TEST_CASE("TransposeNHWCToArmNN_GpuAcc")
+    {
+        int32_t perm[] = {0, 3, 1, 2};
+        TestTensor input{armnn::TensorShape{1, 2, 2, 3},{1, 2, 3, 11, 12, 13, 21, 22, 23, 31, 32, 33}};
+        TestTensor expected{armnn::TensorShape{1, 3, 2, 2},{1, 11, 21, 31, 2, 12, 22, 32, 3, 13, 23, 33}};
+
+        TransposeTestImpl(input, perm, expected, armnn::Compute::GpuAcc);
+    }
+
+    DOCTEST_TEST_CASE("TransposeArmNNToNHWC_GpuAcc")
+    {
+        int32_t perm[] = {0, 2, 3, 1};
+        TestTensor input{armnn::TensorShape{1, 2, 2, 2},{1, 2, 3, 4, 5, 6, 7, 8}};
+        TestTensor expected{armnn::TensorShape{1, 2, 2, 2},{1, 5, 2, 6, 3, 7, 4, 8}};
+
+        TransposeTestImpl(input, perm, expected, armnn::Compute::GpuAcc);
+    }
 }
-
-BOOST_AUTO_TEST_SUITE_END()
+#endif
 
