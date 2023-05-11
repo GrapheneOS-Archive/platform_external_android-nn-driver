@@ -1,5 +1,5 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017-2023 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -20,7 +20,7 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
     switch (operation.type)
     {
         case V1_0::OperationType::ADD:
-            return ConvertAdd(operation, model, data);
+            return ConvertElementwiseBinary(operation, model, data, armnn::BinaryOperation::Add);
         case V1_0::OperationType::AVERAGE_POOL_2D:
             return ConvertAveragePool2d(operation, model, data);
         case V1_0::OperationType::CONCATENATION:
@@ -50,7 +50,7 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
         case V1_0::OperationType::MAX_POOL_2D:
             return ConvertMaxPool2d(operation, model, data);
         case V1_0::OperationType::MUL:
-            return ConvertMul(operation, model, data);
+            return ConvertElementwiseBinary(operation, model, data, armnn::BinaryOperation::Mul);
         case V1_0::OperationType::RELU:
             return ConvertReLu(operation, model, data);
         case V1_0::OperationType::RELU1:
@@ -71,12 +71,6 @@ bool HalPolicy::ConvertOperation(const Operation& operation, const Model& model,
             return Fail("%s: Operation type %s not supported in ArmnnDriver",
                         __func__, toString(operation.type).c_str());
     }
-}
-
-bool HalPolicy::ConvertAdd(const Operation& operation, const Model& model, ConversionData& data)
-{
-    ALOGV("hal_1_0::HalPolicy::ConvertAdd()");
-    return ::ConvertAdd<hal_1_0::HalPolicy>(operation, model, data);
 }
 
 bool HalPolicy::ConvertAveragePool2d(const Operation& operation, const Model& model, ConversionData& data)
@@ -113,6 +107,15 @@ bool HalPolicy::ConvertDequantize(const Operation& operation, const Model& model
 {
     ALOGV("hal_1_0::HalPolicy::ConvertDequantize()");
     return ::ConvertDequantize<hal_1_0::HalPolicy>(operation, model, data);
+}
+
+bool HalPolicy::ConvertElementwiseBinary(const Operation& operation,
+                                         const Model& model,
+                                         ConversionData& data,
+                                         armnn::BinaryOperation binaryOperation)
+{
+    ALOGV("hal_1_0::HalPolicy::ConvertElementwiseBinary()");
+    return ::ConvertElementwiseBinary<hal_1_0::HalPolicy>(operation, model, data, binaryOperation);
 }
 
 bool HalPolicy::ConvertFloor(const Operation& operation, const Model& model, ConversionData& data)
@@ -464,10 +467,12 @@ bool HalPolicy::ConvertLstm(const Operation& operation, const Model& model, Conv
     }
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                IsLstmSupported,
                                data.m_Backends,
                                isSupported,
+                               setBackend,
                                inputInfo,
                                outputStateInInfo,
                                cellStateInInfo,
@@ -484,6 +489,7 @@ bool HalPolicy::ConvertLstm(const Operation& operation, const Model& model, Conv
 
     // Add the layer
     armnn::IConnectableLayer* layer = data.m_Network->AddLstmLayer(desc, params, "Lstm");
+    layer->SetBackendId(setBackend);
 
     input.Connect(layer->GetInputSlot(0));
     outputStateIn.Connect(layer->GetInputSlot(1));
@@ -511,12 +517,6 @@ bool HalPolicy::ConvertMaxPool2d(const Operation& operation, const Model& model,
 {
     ALOGV("hal_1_0::HalPolicy::ConvertMaxPool2d()");
     return ConvertPooling2d<hal_1_0::HalPolicy>(operation, __func__, armnn::PoolingAlgorithm::Max, model, data);
-}
-
-bool HalPolicy::ConvertMul(const Operation& operation, const Model& model, ConversionData& data)
-{
-    ALOGV("hal_1_0::HalPolicy::ConvertMul()");
-    return ::ConvertMul<hal_1_0::HalPolicy>(operation, model, data);
 }
 
 bool HalPolicy::ConvertReLu(const Operation& operation, const Model& model, ConversionData& data)
@@ -566,10 +566,12 @@ bool HalPolicy::ConvertSoftmax(const Operation& operation, const Model& model, C
     }
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                IsSoftmaxSupported,
                                data.m_Backends,
                                isSupported,
+                               setBackend,
                                input.GetTensorInfo(),
                                outputInfo,
                                desc);
@@ -579,7 +581,11 @@ bool HalPolicy::ConvertSoftmax(const Operation& operation, const Model& model, C
     }
 
     armnn::IConnectableLayer* layer = data.m_Network->AddSoftmaxLayer(desc);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the SoftmaxLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<hal_1_0::HalPolicy>(operation, 0, *layer, model, data);
@@ -604,7 +610,6 @@ bool HalPolicy::ConvertSpaceToDepth(const Operation& operation, const Model& mod
     }
 
     armnn::SpaceToDepthDescriptor desc;
-    bool dataLayoutCheck;
 
     GetInputScalar<hal_1_0::HalPolicy>(operation, 1, OperandType::INT32, desc.m_BlockSize, model, data);
 
@@ -626,10 +631,12 @@ bool HalPolicy::ConvertSpaceToDepth(const Operation& operation, const Model& mod
     }
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                IsSpaceToDepthSupported,
                                data.m_Backends,
                                isSupported,
+                               setBackend,
                                inputInfo,
                                outputInfo,
                                desc);
@@ -639,7 +646,11 @@ bool HalPolicy::ConvertSpaceToDepth(const Operation& operation, const Model& mod
     }
 
     armnn::IConnectableLayer* const layer = data.m_Network->AddSpaceToDepthLayer(desc);
-    assert(layer != nullptr);
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the SpaceToDepthLayer", __func__);
+    }
     input.Connect(layer->GetInputSlot(0));
 
     return SetupAndTrackLayerOutputSlot<hal_1_0::HalPolicy>(operation, 0, *layer, model, data);
@@ -686,10 +697,12 @@ bool HalPolicy::ConvertResizeBilinear(const Operation& operation, const Model& m
     desc.m_DataLayout = armnn::DataLayout::NHWC;
 
     bool isSupported = false;
+    armnn::BackendId setBackend;
     FORWARD_LAYER_SUPPORT_FUNC(__func__,
                                IsResizeSupported,
                                data.m_Backends,
                                isSupported,
+                               setBackend,
                                inputInfo,
                                outputInfo,
                                desc);
@@ -705,9 +718,11 @@ bool HalPolicy::ConvertResizeBilinear(const Operation& operation, const Model& m
     }
 
     armnn::IConnectableLayer* layer = data.m_Network->AddResizeLayer(desc);
-
-    assert(layer != nullptr);
-
+    layer->SetBackendId(setBackend);
+    if (!layer)
+    {
+        return Fail("%s: Could not add the ResizeLayer", __func__);
+    }
     layer->GetOutputSlot(0).SetTensorInfo(outputInfo);
     input.Connect(layer->GetInputSlot(0));
 
