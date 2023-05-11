@@ -1,20 +1,18 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
+
 #include "DriverTestHelpers.hpp"
-
-#include "../1.0/HalPolicy.hpp"
-
-#include <boost/test/unit_test.hpp>
 
 #include <log/log.h>
 
-BOOST_AUTO_TEST_SUITE(ConcurrentDriverTests)
-
+DOCTEST_TEST_SUITE("ConcurrentDriverTests")
+{
 using ArmnnDriver   = armnn_driver::ArmnnDriver;
 using DriverOptions = armnn_driver::DriverOptions;
 using HalPolicy     = armnn_driver::hal_1_0::HalPolicy;
+using RequestArgument = V1_0::RequestArgument;
 
 using namespace android::nn;
 using namespace android::hardware;
@@ -25,7 +23,7 @@ using namespace armnn_driver;
 // The main point of this test is to check that multiple requests can be
 // executed without waiting for the callback from previous execution.
 // The operations performed are not significant.
-BOOST_AUTO_TEST_CASE(ConcurrentExecute)
+DOCTEST_TEST_CASE("ConcurrentExecute")
 {
     ALOGI("ConcurrentExecute: entry");
 
@@ -63,36 +61,37 @@ BOOST_AUTO_TEST_CASE(ConcurrentExecute)
         }
     }
 
-    BOOST_TEST(maxRequests == preparedModelsSize);
+    DOCTEST_CHECK(maxRequests == preparedModelsSize);
 
     // construct the request data
-    DataLocation inloc = {};
-    inloc.poolIndex = 0;
-    inloc.offset    = 0;
-    inloc.length    = 3 * sizeof(float);
-    RequestArgument input = {};
-    input.location = inloc;
-    input.dimensions = hidl_vec<uint32_t>{};
+    V1_0::DataLocation inloc = {};
+    inloc.poolIndex          = 0;
+    inloc.offset             = 0;
+    inloc.length             = 3 * sizeof(float);
+    RequestArgument input    = {};
+    input.location           = inloc;
+    input.dimensions         = hidl_vec<uint32_t>{};
 
-    DataLocation outloc = {};
-    outloc.poolIndex = 1;
-    outloc.offset    = 0;
-    outloc.length    = 1 * sizeof(float);
-    RequestArgument output = {};
-    output.location  = outloc;
-    output.dimensions = hidl_vec<uint32_t>{};
+    V1_0::DataLocation outloc = {};
+    outloc.poolIndex          = 1;
+    outloc.offset             = 0;
+    outloc.length             = 1 * sizeof(float);
+    RequestArgument output    = {};
+    output.location           = outloc;
+    output.dimensions         = hidl_vec<uint32_t>{};
 
     // build the requests
     V1_0::Request requests[maxRequests];
+    android::sp<IMemory> inMemory[maxRequests];
     android::sp<IMemory> outMemory[maxRequests];
+    float indata[] = {2, 32, 16};
     float* outdata[maxRequests];
     for (size_t i = 0; i < maxRequests; ++i)
     {
         requests[i].inputs  = hidl_vec<RequestArgument>{input};
         requests[i].outputs = hidl_vec<RequestArgument>{output};
         // set the input data (matching source test)
-        float indata[] = {2, 32, 16};
-        AddPoolAndSetData<float>(3, requests[i], indata);
+        inMemory[i] = AddPoolAndSetData<float>(3, requests[i], indata);
         // add memory for the output
         outMemory[i] = AddPoolAndGetData<float>(1, requests[i]);
         outdata[i] = static_cast<float*>(static_cast<void*>(outMemory[i]->getPointer()));
@@ -110,7 +109,7 @@ BOOST_AUTO_TEST_CASE(ConcurrentExecute)
     ALOGI("ConcurrentExecute: waiting for callbacks");
     for (size_t i = 0; i < maxRequests; ++i)
     {
-        ARMNN_ASSERT(cb[i]);
+        DOCTEST_CHECK(cb[i]);
         cb[i]->wait();
     }
 
@@ -118,9 +117,9 @@ BOOST_AUTO_TEST_CASE(ConcurrentExecute)
     ALOGI("ConcurrentExecute: validating results");
     for (size_t i = 0; i < maxRequests; ++i)
     {
-        BOOST_TEST(outdata[i][0] == 152);
+        DOCTEST_CHECK(outdata[i][0] == 152);
     }
     ALOGI("ConcurrentExecute: exit");
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+}

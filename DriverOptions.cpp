@@ -1,5 +1,5 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
@@ -17,7 +17,6 @@
 #include <cxxopts/cxxopts.hpp>
 
 #include <algorithm>
-#include <cassert>
 #include <functional>
 #include <string>
 #include <sstream>
@@ -36,6 +35,13 @@ DriverOptions::DriverOptions(armnn::Compute computeDevice, bool fp16Enabled)
     , m_EnableGpuProfiling(false)
     , m_fp16Enabled(fp16Enabled)
     , m_FastMathEnabled(false)
+    , m_ShouldExit(false)
+    , m_SaveCachedNetwork(false)
+    , m_NumberOfThreads(0)
+    , m_EnableAsyncModelExecution(false)
+    , m_ArmnnNumberOfThreads(1)
+    , m_EnableImport(false)
+    , m_EnableExport(false)
 {
 }
 
@@ -47,6 +53,13 @@ DriverOptions::DriverOptions(const std::vector<armnn::BackendId>& backends, bool
     , m_EnableGpuProfiling(false)
     , m_fp16Enabled(fp16Enabled)
     , m_FastMathEnabled(false)
+    , m_ShouldExit(false)
+    , m_SaveCachedNetwork(false)
+    , m_NumberOfThreads(0)
+    , m_EnableAsyncModelExecution(false)
+    , m_ArmnnNumberOfThreads(1)
+    , m_EnableImport(false)
+    , m_EnableExport(false)
 {
 }
 
@@ -58,6 +71,12 @@ DriverOptions::DriverOptions(int argc, char** argv)
     , m_fp16Enabled(false)
     , m_FastMathEnabled(false)
     , m_ShouldExit(false)
+    , m_SaveCachedNetwork(false)
+    , m_NumberOfThreads(0)
+    , m_EnableAsyncModelExecution(false)
+    , m_ArmnnNumberOfThreads(1)
+    , m_EnableImport(false)
+    , m_EnableExport(false)
 {
     std::string unsupportedOperationsAsString;
     std::string clTunedParametersModeAsString;
@@ -98,6 +117,10 @@ DriverOptions::DriverOptions(int argc, char** argv)
          "the file accordingly.",
          cxxopts::value<std::string>(clTunedParametersModeAsString)->default_value("UseTunedParameters"))
 
+        ("g,mlgo-cl-tuned-parameters-file",
+        "If non-empty, the given file will be used to load/save MLGO CL tuned parameters. ",
+        cxxopts::value<std::string>(m_ClMLGOTunedParametersFile)->default_value(""))
+
         ("n,service-name",
          "If non-empty, the driver service name to be registered",
          cxxopts::value<std::string>(m_ServiceName)->default_value("armnn"))
@@ -111,6 +134,22 @@ DriverOptions::DriverOptions(int argc, char** argv)
 
         ("p,gpu-profiling", "Turns GPU profiling on",
          cxxopts::value<bool>(m_EnableGpuProfiling)->default_value("false"))
+
+        ("q,cached-network-file", "If non-empty, the given file will be used to load/save cached network. "
+                                   "If save-cached-network option is given will save the cached network to given file."
+                                   "If save-cached-network option is not given will load the cached network from given "
+                                   "file.",
+        cxxopts::value<std::string>(m_CachedNetworkFilePath)->default_value(""))
+
+        ("s,save-cached-network", "Enables saving the cached network to the file given with cached-network-file option."
+                                  " See also --cached-network-file",
+        cxxopts::value<bool>(m_SaveCachedNetwork)->default_value("false"))
+
+        ("number-of-threads",
+         "Assign the number of threads used by the CpuAcc backend. "
+         "Input value must be between 1 and 64. "
+         "Default is set to 0 (Backend will decide number of threads to use).",
+         cxxopts::value<unsigned int>(m_NumberOfThreads)->default_value("0"))
 
         ("t,cl-tuned-parameters-file",
          "If non-empty, the given file will be used to load/save CL tuned parameters. "
@@ -126,7 +165,22 @@ DriverOptions::DriverOptions(int argc, char** argv)
          cxxopts::value<bool>(m_VerboseLogging)->default_value("false"))
 
         ("V,version", "Show version information",
-         cxxopts::value<bool>(showVersion)->default_value("false"));
+         cxxopts::value<bool>(showVersion)->default_value("false"))
+
+        ("A,asyncModelExecution", "Enable AsynModel Execution",
+         cxxopts::value<bool>(m_EnableAsyncModelExecution)->default_value("false"))
+
+        ("T,armnn-threads",
+         "Assign the number of threads used by ArmNN. "
+         "Input value must be at least 1. "
+         "Default is set to 1.",
+         cxxopts::value<unsigned int>(m_ArmnnNumberOfThreads)->default_value("1"))
+
+        ("I,enableImport", "Enable Importing of input buffers",
+         cxxopts::value<bool>(m_EnableImport)->default_value("false"))
+
+        ("E,enableExport", "Enable Exporting of output buffers",
+         cxxopts::value<bool>(m_EnableExport)->default_value("false"));
     }
     catch (const std::exception& e)
     {

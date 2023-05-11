@@ -4,7 +4,6 @@
 //
 
 #include "ArmnnDriverImpl.hpp"
-#include "../NamespaceAdaptor.hpp"
 #include "../SystemPropertiesUtils.hpp"
 
 #include <log/log.h>
