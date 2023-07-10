@@ -438,6 +438,12 @@ Return<void> ArmnnPreparedModel_1_3<HalVersion>::executeFenced(const V1_3::Reque
             return Void();
         }
 
+        if (fenceNativeHandle->numFds != 1)
+        {
+            cb(V1_3::ErrorStatus::INVALID_ARGUMENT, hidl_handle(nullptr), nullptr);
+            return Void();
+        }
+
         if (sync_wait(fenceNativeHandle->data[0], -1) < 0)
         {
             ALOGE("ArmnnPreparedModel_1_3::executeFenced sync fence failed.");
