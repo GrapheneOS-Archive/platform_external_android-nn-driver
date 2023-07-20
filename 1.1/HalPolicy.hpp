@@ -1,12 +1,11 @@
 //
-// Copyright © 2017 Arm Ltd. All rights reserved.
+// Copyright © 2017-2021,2023 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
 #pragma once
 
 #include "../ConversionUtils.hpp"
-#include "../NamespaceAdaptor.hpp"
 
 #include <HalInterfaces.h>
 
@@ -32,8 +31,11 @@ public:
     static bool ConvertOperation(const Operation& operation, const Model& model, ConversionData& data);
 
 private:
-    static bool ConvertDiv(const Operation& operation, const Model& model, ConversionData& data);
-    static bool ConvertSub(const Operation& operation, const Model& model, ConversionData& data);
+    static bool ConvertElementwiseBinary(const Operation& operation,
+                                         const Model& model,
+                                         ConversionData& data,
+                                         armnn::BinaryOperation binaryOperation);
+
     static bool ConvertMean(const Operation& operation, const Model& model, ConversionData& data);
     static bool ConvertPad(const Operation& operation, const Model& model, ConversionData& data);
     static bool ConvertSpaceToBatchNd(const Operation& operation, const Model& model, ConversionData& data);

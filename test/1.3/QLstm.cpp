@@ -1,22 +1,13 @@
 //
-// Copyright © 2020 Arm Ltd. All rights reserved.
+// Copyright © 2020 Arm Ltd and Contributors. All rights reserved.
 // SPDX-License-Identifier: MIT
 //
 
 #include "../DriverTestHelpers.hpp"
-#include "../TestTensor.hpp"
 
-#include "../1.3/HalPolicy.hpp"
-
-#include <armnn/utility/IgnoreUnused.hpp>
-
-#include <boost/test/unit_test.hpp>
-#include <boost/test/data/test_case.hpp>
-#include <boost/math/special_functions/relative_difference.hpp>
+#include <1.3/HalPolicy.hpp>
 
 #include <array>
-
-BOOST_AUTO_TEST_SUITE(QLSTMTests)
 
 using ArmnnDriver   = armnn_driver::ArmnnDriver;
 using DriverOptions = armnn_driver::DriverOptions;
@@ -26,13 +17,15 @@ using namespace android::hardware;
 
 using HalPolicy = hal_1_3::HalPolicy;
 
+static const float TOLERANCE = 1.0f;
+
 namespace
 {
 
 template<typename T>
 RequestArgument CreateRequestArgument(const std::vector<T>& value, unsigned int poolIndex)
 {
-    DataLocation inputInloc = {};
+    V1_0::DataLocation inputInloc = {};
     inputInloc.poolIndex = poolIndex;
     inputInloc.offset = 0;
     inputInloc.length = value.size() * sizeof(T);
@@ -40,26 +33,6 @@ RequestArgument CreateRequestArgument(const std::vector<T>& value, unsigned int 
     inputRequestArgument.location = inputInloc;
     inputRequestArgument.dimensions = hidl_vec<uint32_t>{};
     return inputRequestArgument;
-}
-
-// Returns true if the relative difference between two float values is less than the tolerance value given.
-// This is used because the floating point comparison tolerance (set on each BOOST_AUTO_TEST_CASE) does not work!
-bool TolerantCompareEqual(float a, float b, float tolerance = 1.0f)
-{
-    float rd;
-    if (a == 0.0f)
-    {
-        rd = fabs(b);
-    }
-    else if (b == 0.0f)
-    {
-        rd = fabs(a);
-    }
-    else
-    {
-        rd = boost::math::relative_difference(a, b);
-    }
-    return rd < tolerance;
 }
 
 // Helper function to create an OperandLifeTime::NO_VALUE for testing.
@@ -84,12 +57,6 @@ void ExecuteModel(const armnn_driver::hal_1_3::HalPolicy::Model& model,
         Execute(preparedModel, request);
     }
 }
-
-#ifndef ARMCOMPUTECL_ENABLED
-static const std::array<armnn::Compute, 1> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef }};
-#else
-static const std::array<armnn::Compute, 2> COMPUTE_DEVICES = {{ armnn::Compute::CpuRef, armnn::Compute::CpuAcc }};
-#endif
 
 // Add our own tests here since we skip the qlstm tests which Google supplies (because of non-const weights)
 void QLstmTestImpl(const hidl_vec<uint32_t>&   inputDimensions,
@@ -527,8 +494,9 @@ void QLstmTestImpl(const hidl_vec<uint32_t>&   inputDimensions,
     // check the results
     for (size_t i = 0; i < outputStateOutValue.size(); ++i)
     {
-        BOOST_TEST(TolerantCompareEqual(outputStateOutValue[i], outputStateOutData[i]),
-                   "outputStateOut[" << i << "]: " << outputStateOutValue[i] << " != " << outputStateOutData[i]);
+        DOCTEST_CHECK_MESSAGE(outputStateOutValue[i] == doctest::Approx( outputStateOutData[i] ).epsilon(TOLERANCE),
+                              "outputStateOut[" << i << "]: " << outputStateOutValue[i] << " != "
+                              << outputStateOutData[i]);
     }
 
     // CELL STATE OUTPUT Does not match currently: IVGCVSW-4860 Verify remaining VTS tests (2) for QLSTM
@@ -541,8 +509,8 @@ void QLstmTestImpl(const hidl_vec<uint32_t>&   inputDimensions,
 
     for (size_t i = 0; i < outputValue.size(); ++i)
     {
-        BOOST_TEST(TolerantCompareEqual(outputValue[i], outputData[i]),
-                   "output[" << i << "]: " << outputValue[i] << " != " << outputData[i]);
+        DOCTEST_CHECK_MESSAGE(outputValue[i] == doctest::Approx( outputData[i] ).epsilon(TOLERANCE),
+                              "output[" << i << "]: " << outputValue[i] << " != " << outputData[i]);
     }
 }
 
@@ -1028,19 +996,38 @@ void DynamicOutputQLstmWithNoProjection(armnn::Compute compute)
 } // anonymous namespace
 
 // Support is not added yet
-//BOOST_DATA_TEST_CASE(QLSTMWithProjectionTest, COMPUTE_DEVICES)
+//TEST_CASE(QLSTMWithProjectionTest, COMPUTE_DEVICES)
 //{
 //     QLstmWithProjection(sample);
 //}
 
-BOOST_DATA_TEST_CASE(QLSTMWithNoProjectionTest, COMPUTE_DEVICES)
+DOCTEST_TEST_SUITE("QLSTMTests_CpuRef")
 {
-    QLstmWithNoProjection(sample);
-}
 
-BOOST_DATA_TEST_CASE(DynamicOutputQLSTMWithNoProjectionTest, COMPUTE_DEVICES)
+    DOCTEST_TEST_CASE("QLSTMWithNoProjectionTest_CpuRef")
+    {
+        QLstmWithNoProjection(armnn::Compute::CpuRef);
+    }
+
+    DOCTEST_TEST_CASE("DynamicOutputQLstmWithNoProjection_CpuRef")
+    {
+        DynamicOutputQLstmWithNoProjection(armnn::Compute::CpuRef);
+    }
+
+}
+#ifdef ARMCOMPUTECL_ENABLED
+DOCTEST_TEST_SUITE("QLSTMTests_CpuAcc")
 {
-    DynamicOutputQLstmWithNoProjection(sample);
-}
 
-BOOST_AUTO_TEST_SUITE_END()
+    DOCTEST_TEST_CASE("QLSTMWithNoProjectionTest_CpuAcc")
+    {
+        QLstmWithNoProjection(armnn::Compute::CpuAcc);
+    }
+
+    DOCTEST_TEST_CASE("DynamicOutputQLstmWithNoProjection_CpuAcc")
+    {
+        DynamicOutputQLstmWithNoProjection(armnn::Compute::CpuAcc);
+    }
+
+}
+#endif
